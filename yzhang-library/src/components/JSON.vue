@@ -98,6 +98,17 @@
       <!-- [OPTIONAL - NON ASSESSED] Activity 6: Attribute, Class and Style Bindings -->
       <h2>Attribute, Class and Style Binding with <code>v-bind</code></h2>
       <p>Highlighting Specific Authors:</p>
+      <ul>
+        <li
+          v-for="author in authors"
+          :key="author.id"
+          :class="{ highlight: isOrwell(author) }"
+          :style="isOrwell(author) ? { color: '#fff', fontWeight: 'bold' } : {}"
+          :title="isOrwell(author) ? 'Featured Author: George Orwell' : author.name"
+        >
+          {{ author.name }} ({{ author.birthYear }})
+        </li>
+      </ul>
     </section>
   </div>
 </template>
@@ -123,6 +134,9 @@ const allFamousWorks = computed(() =>
   // TODO: CODE TO GET ALL FAMOUS WORKS HERE
   authors.flatMap((author) => author.famousWorks.map((work) => work.title))
 );
+
+// Activity 6: Determine whether an author is George Orwell (used for attribute/class/style bindings)
+const isOrwell = (author) => author.name === 'George Orwell';
 </script>
 
 <style scoped>
