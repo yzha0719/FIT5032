@@ -135,7 +135,7 @@ const allFamousWorks = computed(() =>
   authors.flatMap((author) => author.famousWorks.map((work) => work.title))
 );
 
-// Activity 6: Determine whether an author is George Orwell (used for attribute/class/style bindings)
+// Activity 5: Determine whether an author is George Orwell (used for attribute/class/style bindings)
 const isOrwell = (author) => author.name === 'George Orwell';
 </script>
 
