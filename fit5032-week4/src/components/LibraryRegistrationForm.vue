@@ -28,9 +28,11 @@
                             <div class="form-check">
                                 <input type="checkbox" class="form-check-input"
                                     id="isAustralian"
+                                    @change="() => validateResident(true)"
                                     v-model="formData.isAustralian">
                                 <label class="form-check-label" for="isAustralian">Australian Resident?</label>
                             </div>
+                            <div v-if="errors.resident" class="text-danger">{{ errors.resident }}</div>
                         </div>
                         <div class="col-md-6">
                             <label for="gender" class="form-label">Gender</label>
@@ -63,19 +65,20 @@
         </div>
     </div>
 
-    <div class="row mt-5" v-if="submittedCards.length">
-        <div class="d-flex flex-wrap justify-content-start">
-            <div v-for="(card, index) in submittedCards" :key="index" class="card m-2" style="width: 18rem;">
-                <div class="card-header">
-                    User Information
-                </div>
-                <ul class="list-group list-group-flush">
-                    <li class="list-group-item">Username: {{ card.username }}</li>
-                    <li class="list-group-item">Password: {{ card.password }}</li>
-                    <li class="list-group-item">Australian Resident: {{ card.isAustralian ? 'Yes' : 'No' }}</li>
-                    <li class="list-group-item">Gender: {{ card.gender }}</li>
-                    <li class="list-group-item">Reason: {{ card.reason }}</li>
-                </ul>
+    <div class="container mt-5" v-if="submittedCards.length">
+        <div class="row">
+            <div class="col-md-8 offset-md-2">
+                <DataTable :value="submittedCards" tableStyle="min-width: 30rem">
+                    <Column field="username" header="Username"></Column>
+                    <Column field="password" header="Password"></Column>
+                    <Column header="Australian Resident">
+                        <template #body="slotProps">
+                            {{ slotProps.data.isAustralian ? 'Yes' : 'No' }}
+                        </template>
+                    </Column>
+                    <Column field="gender" header="Gender"></Column>
+                    <Column field="reason" header="Reason"></Column>
+                </DataTable>
             </div>
         </div>
     </div>
@@ -98,9 +101,10 @@ const submittedCards = ref([]);
 const submitForm = () => {
     validateName(true);
     validatePassword(true);
+    validateResident(true);
     validateGender(true);
     validateReason(true);
-    if (!errors.value.username && !errors.value.password && !errors.value.gender && !errors.value.reason) {
+    if (!errors.value.username && !errors.value.password && !errors.value.resident && !errors.value.gender && !errors.value.reason) {
         submittedCards.value.push({...formData.value});
         clearForm();
     }
@@ -155,6 +159,14 @@ const validatePassword = (blur) => {
     }
 };
 
+const validateResident = (blur) => {
+    if (!formData.value.isAustralian) {
+        if (blur) errors.value.resident = 'You must be an Australian resident to join.';
+    } else {
+        errors.value.resident = null;
+    }
+};
+
 const validateGender = (blur) => {
     if (!formData.value.gender) {
         if (blur) errors.value.gender = 'Please select a gender.';
@@ -173,19 +185,3 @@ const validateReason = (blur) => {
 };
 </script>
 
-<style scoped>
-   .card {
-   border: 1px solid #ccc;
-   border-radius: 10px;
-   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-   }
-   .card-header {
-   background-color: #275FDA;
-   color: white;
-   padding: 10px;
-   border-radius: 10px 10px 0 0;
-   }
-   .list-group-item {
-   padding: 10px;
-   }
-</style>
