@@ -3,7 +3,7 @@
 
 <template>
   <div class="page-placeholder">
-    <h1>About Us</h1>
-    <p>Organisation story, mission and team will go here.</p>
+    <h1>Get Involved</h1>
+    <p>Volunteer sign-up and donation forms will go here.</p>
   </div>
 </template>

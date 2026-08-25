@@ -3,7 +3,7 @@
 
 <template>
   <div class="page-placeholder">
-    <h1>About Us</h1>
-    <p>Organisation story, mission and team will go here.</p>
+    <h1>Contact</h1>
+    <p>Contact form will go here.</p>
   </div>
 </template>
