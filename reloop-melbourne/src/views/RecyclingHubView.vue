@@ -1,9 +1,26 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { recyclingGuide, recyclingCategories } from '../data/recyclingGuide'
+import { useLocalStorageState } from '../composables/useLocalStorageState'
 
 const searchTerm = ref('')
 const selectedCategory = ref('All')
+
+// Saved item ids persist in localStorage so residents can come back later
+// and find the items they bookmarked (BR B.2 hint).
+const savedItemIds = useLocalStorageState('reloop:saved-recycling-items', [])
+
+function isSaved(id) {
+  return savedItemIds.value.includes(id)
+}
+
+function toggleSaved(id) {
+  if (isSaved(id)) {
+    savedItemIds.value = savedItemIds.value.filter((savedId) => savedId !== id)
+  } else {
+    savedItemIds.value = [...savedItemIds.value, id]
+  }
+}
 
 const filteredGuide = computed(() => {
   const term = searchTerm.value.trim().toLowerCase()
@@ -49,12 +66,27 @@ const filteredGuide = computed(() => {
         </div>
         <p class="filter-bar__count">
           {{ filteredGuide.length }} of {{ recyclingGuide.length }} items
+          <span v-if="savedItemIds.length"> &middot; {{ savedItemIds.length }} saved</span>
         </p>
       </div>
 
       <div v-if="filteredGuide.length" class="guide-grid">
         <article v-for="entry in filteredGuide" :key="entry.id" class="crate-card guide-card">
-          <span class="crate-card__tag">{{ entry.category.toUpperCase() }}</span>
+          <div class="guide-card__head">
+            <span class="crate-card__tag">{{ entry.category.toUpperCase() }}</span>
+            <button
+              type="button"
+              class="guide-card__save"
+              :class="{ 'is-saved': isSaved(entry.id) }"
+              :aria-pressed="isSaved(entry.id)"
+              :aria-label="
+                isSaved(entry.id) ? `Remove ${entry.item} from saved items` : `Save ${entry.item}`
+              "
+              @click="toggleSaved(entry.id)"
+            >
+              {{ isSaved(entry.id) ? '★ Saved' : '☆ Save' }}
+            </button>
+          </div>
           <h3 class="guide-card__item">{{ entry.item }}</h3>
           <p class="guide-card__action">{{ entry.action }}</p>
           <p class="guide-card__notes">{{ entry.notes }}</p>
@@ -101,6 +133,27 @@ const filteredGuide = computed(() => {
   display: grid;
   grid-template-columns: 1fr;
   gap: 1.25rem;
+}
+
+.guide-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.guide-card__save {
+  background: transparent;
+  border: none;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--chalk);
+  cursor: pointer;
+  padding: 0.25rem 0;
+}
+
+.guide-card__save.is-saved {
+  color: var(--reclaim);
+  font-weight: 700;
 }
 
 .guide-card__item {
