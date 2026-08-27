@@ -4,6 +4,7 @@ import { impactStats } from '../data/impactStats'
 import { upcomingEvents } from '../data/events'
 import { blogPosts } from '../data/blogPosts'
 import TicketDivider from '../components/TicketDivider.vue'
+import BlogCard from '../components/BlogCard.vue'
 
 // Reactive display values that animate from 0 up to each stat's real value.
 // This is what makes the numbers driven by src/data/impactStats.js (BR B.2)
@@ -107,21 +108,7 @@ const featuredPosts = blogPosts.slice(0, 2)
   <section class="section section--tight">
     <div class="container-app">
       <div class="card-grid card-grid--wide">
-        <article v-for="post in featuredPosts" :key="post.id" class="crate-card blog-card">
-          <span class="crate-card__tag">{{ post.category.toUpperCase() }}</span>
-          <h3 class="blog-card__title">{{ post.title }}</h3>
-          <p class="blog-card__excerpt">{{ post.excerpt }}</p>
-          <p class="blog-card__meta">
-            {{
-              new Date(post.date).toLocaleDateString('en-AU', {
-                day: 'numeric',
-                month: 'short',
-                year: 'numeric',
-              })
-            }}
-            &middot; {{ post.readMinutes }} min read
-          </p>
-        </article>
+        <BlogCard v-for="post in featuredPosts" :key="post.id" :post="post" />
       </div>
     </div>
   </section>
@@ -200,29 +187,6 @@ const featuredPosts = blogPosts.slice(0, 2)
 .event-card__spots {
   margin: 0;
   font-size: 0.9rem;
-}
-
-.blog-card {
-  display: flex;
-  flex-direction: column;
-}
-
-.blog-card__title {
-  font-size: 1.1rem;
-  margin-top: 0.75rem;
-}
-
-.blog-card__excerpt {
-  font-size: 0.92rem;
-  color: var(--ink-soft);
-  flex: 1;
-}
-
-.blog-card__meta {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: var(--chalk);
-  margin: 0;
 }
 
 @media (min-width: 576px) {
