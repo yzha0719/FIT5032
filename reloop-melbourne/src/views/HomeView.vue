@@ -1,5 +1,41 @@
 <script setup>
+import { ref, onMounted } from 'vue'
+import { impactStats } from '../data/impactStats'
+import { upcomingEvents } from '../data/events'
+import { blogPosts } from '../data/blogPosts'
 import TicketDivider from '../components/TicketDivider.vue'
+
+// Reactive display values that animate from 0 up to each stat's real value.
+// This is what makes the numbers driven by src/data/impactStats.js (BR B.2)
+// instead of hard-coded text.
+const displayValues = ref(impactStats.map(() => 0))
+
+onMounted(() => {
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+  impactStats.forEach((stat, index) => {
+    if (prefersReducedMotion) {
+      displayValues.value[index] = stat.value
+      return
+    }
+
+    const duration = 1200
+    const start = performance.now()
+
+    function step(now) {
+      const progress = Math.min((now - start) / duration, 1)
+      displayValues.value[index] = Math.round(stat.value * progress)
+      if (progress < 1) {
+        requestAnimationFrame(step)
+      }
+    }
+
+    requestAnimationFrame(step)
+  })
+})
+
+const featuredEvents = upcomingEvents.slice(0, 3)
+const featuredPosts = blogPosts.slice(0, 2)
 </script>
 
 <template>
@@ -26,21 +62,11 @@ import TicketDivider from '../components/TicketDivider.vue'
     <div class="container-app">
       <p class="eyebrow">Our impact so far</p>
       <div class="stats-grid">
-        <div class="stat-block">
-          <span class="stat-block__value">12,406</span>
-          <span class="stat-block__label">KG diverted from landfill</span>
-        </div>
-        <div class="stat-block">
-          <span class="stat-block__value">38</span>
-          <span class="stat-block__label">Partner sites</span>
-        </div>
-        <div class="stat-block">
-          <span class="stat-block__value">1,900+</span>
-          <span class="stat-block__label">Community members</span>
-        </div>
-        <div class="stat-block">
-          <span class="stat-block__value">215</span>
-          <span class="stat-block__label">Workshops run</span>
+        <div v-for="(stat, index) in impactStats" :key="stat.id" class="stat-block">
+          <span class="stat-block__value"
+            >{{ displayValues[index].toLocaleString('en-AU') }}{{ stat.suffix }}</span
+          >
+          <span class="stat-block__label">{{ stat.label }}</span>
         </div>
       </div>
     </div>
@@ -55,23 +81,22 @@ import TicketDivider from '../components/TicketDivider.vue'
         <router-link to="/get-involved" class="section-heading__link">See all &rarr;</router-link>
       </div>
       <div class="card-grid">
-        <article class="crate-card">
-          <span class="crate-card__tag">REPAIR</span>
-          <h3 class="event-card__title">Repair Café — small appliances</h3>
-          <p class="event-card__meta">Sat 30 Aug &middot; Coburg</p>
-          <p class="event-card__spots"><strong>6</strong> spots left</p>
-        </article>
-        <article class="crate-card">
-          <span class="crate-card__tag">SWAP</span>
-          <h3 class="event-card__title">Kids' Clothing Swap Meet</h3>
-          <p class="event-card__meta">Sun 6 Sep &middot; Preston</p>
-          <p class="event-card__spots"><strong>14</strong> spots left</p>
-        </article>
-        <article class="crate-card">
-          <span class="crate-card__tag">WORKSHOP</span>
-          <h3 class="event-card__title">Composting 101 Workshop</h3>
-          <p class="event-card__meta">Wed 9 Sep &middot; Brunswick</p>
-          <p class="event-card__spots"><strong>2</strong> spots left</p>
+        <article v-for="event in featuredEvents" :key="event.id" class="crate-card">
+          <span class="crate-card__tag">{{ event.category.toUpperCase() }}</span>
+          <h3 class="event-card__title">{{ event.title }}</h3>
+          <p class="event-card__meta">
+            {{
+              new Date(event.date).toLocaleDateString('en-AU', {
+                weekday: 'short',
+                day: 'numeric',
+                month: 'short',
+              })
+            }}
+            &middot; {{ event.suburb }}
+          </p>
+          <p class="event-card__spots">
+            <strong>{{ event.spotsLeft }}</strong> spots left
+          </p>
         </article>
       </div>
     </div>
@@ -82,25 +107,20 @@ import TicketDivider from '../components/TicketDivider.vue'
   <section class="section section--tight">
     <div class="container-app">
       <div class="card-grid card-grid--wide">
-        <article class="crate-card blog-card">
-          <span class="crate-card__tag">RECYCLING BASICS</span>
-          <h3 class="blog-card__title">
-            Why one greasy pizza box can contaminate a whole truckload
-          </h3>
-          <p class="blog-card__excerpt">
-            A short guide to the most common contamination mistakes residents make, and how a single
-            bin can affect an entire collection run.
+        <article v-for="post in featuredPosts" :key="post.id" class="crate-card blog-card">
+          <span class="crate-card__tag">{{ post.category.toUpperCase() }}</span>
+          <h3 class="blog-card__title">{{ post.title }}</h3>
+          <p class="blog-card__excerpt">{{ post.excerpt }}</p>
+          <p class="blog-card__meta">
+            {{
+              new Date(post.date).toLocaleDateString('en-AU', {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric',
+              })
+            }}
+            &middot; {{ post.readMinutes }} min read
           </p>
-          <p class="blog-card__meta">18 Jul 2026 &middot; 4 min read</p>
-        </article>
-        <article class="crate-card blog-card">
-          <span class="crate-card__tag">COMMUNITY</span>
-          <h3 class="blog-card__title">What actually happens at a repair café</h3>
-          <p class="blog-card__excerpt">
-            From toasters to torn jackets — a first-timer's walkthrough of what to bring, what to
-            expect, and how volunteers decide what can be saved.
-          </p>
-          <p class="blog-card__meta">2 Jul 2026 &middot; 5 min read</p>
         </article>
       </div>
     </div>
