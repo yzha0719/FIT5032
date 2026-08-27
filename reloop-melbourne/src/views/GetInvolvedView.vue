@@ -1,5 +1,6 @@
 <script setup>
 import { reactive, ref } from 'vue'
+import { useLocalStorageState } from '../composables/useLocalStorageState'
 import {
   required,
   minLength,
@@ -23,6 +24,7 @@ const volunteerErrors = reactive({
 })
 
 const volunteerSubmitted = ref(false)
+const volunteerSignup = useLocalStorageState('reloop:volunteer-signup', null)
 const interestAreas = ['Repair café', 'Swap meets & events', 'Schools program', 'Admin & comms']
 
 function validateVolunteerField(field) {
@@ -53,6 +55,11 @@ function submitVolunteerForm() {
   const hasErrors = Object.values(volunteerErrors).some(Boolean)
   if (hasErrors) return
 
+  volunteerSignup.value = {
+    fullName: volunteerForm.fullName,
+    interestArea: volunteerForm.interestArea,
+    submittedAt: new Date().toISOString(),
+  }
   volunteerSubmitted.value = true
   volunteerForm.fullName = ''
   volunteerForm.email = ''
@@ -178,6 +185,9 @@ function submitDonationForm() {
           </div>
 
           <button type="submit" class="btn-reloop btn-reloop--primary">Join as a volunteer</button>
+          <p v-if="volunteerSignup" class="form-card__count">
+            You're signed up as a volunteer for "{{ volunteerSignup.interestArea }}" — see you soon.
+          </p>
         </form>
       </div>
 
@@ -263,6 +273,13 @@ function submitDonationForm() {
 .form-card__title {
   font-size: 1.4rem;
   margin: 0.75rem 0 1.25rem;
+}
+
+.form-card__count {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  margin: 0.9rem 0 0;
 }
 
 @media (min-width: 992px) {
