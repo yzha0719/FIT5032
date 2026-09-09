@@ -31,8 +31,14 @@ const handleLogout = () => {
         <li class="nav-item" v-if="isAuthenticated">
           <a href="#" class="nav-link" @click.prevent="handleLogout">Logout</a>
         </li>
-        <li class="nav-item" v-else>
+        <!-- <li class="nav-item" v-else>
           <router-link to="/login" class="nav-link" active-class="active">Login</router-link>
+        </li> -->
+        <li class="nav-item">
+          <router-link to="/FireRegister" class="nav-link" active-class="active">Firebase Register</router-link>
+        </li>
+        <li class="nav-item">
+          <router-link to="/FireLogin" class="nav-link" active-class="active">Firebase Login</router-link>
         </li>
       </ul>
     </header>
