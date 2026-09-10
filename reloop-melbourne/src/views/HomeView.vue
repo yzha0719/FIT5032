@@ -1,10 +1,14 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { impactStats } from '../data/impactStats'
-import { upcomingEvents } from '../data/events'
+import { events, isPastEvent } from '../data/events'
 import { blogPosts } from '../data/blogPosts'
+import { useAuth } from '../composables/useAuth'
+import { useRatings } from '../composables/useRatings'
 import TicketDivider from '../components/TicketDivider.vue'
 import BlogCard from '../components/BlogCard.vue'
+import RatingSummary from '../components/RatingSummary.vue'
+import StarRatingInput from '../components/StarRatingInput.vue'
 
 // Reactive display values that animate from 0 up to each stat's real value.
 // This is what makes the numbers driven by src/data/impactStats.js (BR B.2)
@@ -35,7 +39,40 @@ onMounted(() => {
   })
 })
 
-const featuredEvents = upcomingEvents.slice(0, 3)
+// Split by date when the page loads (see isPastEvent in data/events.js).
+const featuredEvents = events.filter((event) => !isPastEvent(event)).slice(0, 3)
+
+// Most recent first, since those are the events people remember best.
+const recentPastEvents = events
+  .filter((event) => isPastEvent(event))
+  .sort((a, b) => b.date.localeCompare(a.date))
+  .slice(0, 3)
+
+const { isAuthenticated } = useAuth()
+const { getSummary, getUserRating, canRate, rate } = useRatings()
+
+// Latest error for each event card, cleared once a rating saves.
+const ratingErrors = reactive({})
+
+function handleRate(eventId, stars) {
+  const result = rate(eventId, stars)
+  ratingErrors[eventId] = result.ok ? null : result.error
+}
+
+function ratingStatus(eventId) {
+  if (ratingErrors[eventId]) return ratingErrors[eventId]
+  const own = getUserRating(eventId)
+  if (own) return `You rated this ${own} ${own === 1 ? 'star' : 'stars'}.`
+  return 'Went along? Pick a star to rate it.'
+}
+
+function formatEventDate(date) {
+  return new Date(date).toLocaleDateString('en-AU', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  })
+}
 const featuredPosts = blogPosts.slice(0, 2)
 </script>
 
@@ -81,23 +118,57 @@ const featuredPosts = blogPosts.slice(0, 2)
         <h2>Workshops &amp; swap events</h2>
         <router-link to="/get-involved" class="section-heading__link">See all &rarr;</router-link>
       </div>
-      <div class="card-grid">
+      <div v-if="featuredEvents.length" class="card-grid">
         <article v-for="event in featuredEvents" :key="event.id" class="crate-card">
           <span class="crate-card__tag">{{ event.category.toUpperCase() }}</span>
           <h3 class="event-card__title">{{ event.title }}</h3>
           <p class="event-card__meta">
-            {{
-              new Date(event.date).toLocaleDateString('en-AU', {
-                weekday: 'short',
-                day: 'numeric',
-                month: 'short',
-              })
-            }}
-            &middot; {{ event.suburb }}
+            {{ formatEventDate(event.date) }} &middot; {{ event.suburb }}
           </p>
           <p class="event-card__spots">
             <strong>{{ event.spotsLeft }}</strong> spots left
           </p>
+        </article>
+      </div>
+      <p v-else class="events-empty">No upcoming events right now. Check back soon.</p>
+    </div>
+  </section>
+
+  <TicketDivider label="Rated by the community" />
+
+  <section class="section section--tight">
+    <div class="container-app">
+      <div class="section-heading">
+        <h2>Recent events</h2>
+      </div>
+      <p v-if="!isAuthenticated" class="rating-hint">
+        Went to one of these?
+        <router-link :to="{ name: 'login', query: { redirect: '/' } }">Log in</router-link> to leave
+        a rating.
+      </p>
+      <div class="card-grid">
+        <article v-for="event in recentPastEvents" :key="event.id" class="crate-card">
+          <span class="crate-card__tag">{{ event.category.toUpperCase() }}</span>
+          <h3 class="event-card__title">{{ event.title }}</h3>
+          <p class="event-card__meta">
+            {{ formatEventDate(event.date) }} &middot; {{ event.suburb }}
+          </p>
+          <RatingSummary v-bind="getSummary(event.id)" />
+
+          <div v-if="canRate(event)" class="event-card__rate">
+            <StarRatingInput
+              :model-value="getUserRating(event.id)"
+              :label="`Your rating for ${event.title}`"
+              @update:model-value="(stars) => handleRate(event.id, stars)"
+            />
+            <p
+              class="event-card__rate-status"
+              :class="{ 'is-error': ratingErrors[event.id] }"
+              aria-live="polite"
+            >
+              {{ ratingStatus(event.id) }}
+            </p>
+          </div>
         </article>
       </div>
     </div>
@@ -187,6 +258,28 @@ const featuredPosts = blogPosts.slice(0, 2)
 .event-card__spots {
   margin: 0;
   font-size: 0.9rem;
+}
+
+.events-empty,
+.rating-hint {
+  color: var(--ink-soft);
+}
+
+.event-card__rate {
+  margin-top: 0.75rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--kraft-dark);
+}
+
+.event-card__rate-status {
+  margin: 0.25rem 0 0;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+.event-card__rate-status.is-error {
+  font-weight: 600;
+  color: var(--reclaim-dark);
 }
 
 @media (min-width: 576px) {
