@@ -45,6 +45,37 @@ export function numberRange(label, min, max) {
   }
 }
 
+// Shared by the passwordStrength validator and the live checklist on the
+// register form, so the rules only live in one place.
+export const PASSWORD_RULES = [
+  { text: 'at least 8 characters', test: (value) => value.length >= 8 },
+  { text: 'an uppercase letter', test: (value) => /[A-Z]/.test(value) },
+  { text: 'a lowercase letter', test: (value) => /[a-z]/.test(value) },
+  { text: 'a number', test: (value) => /\d/.test(value) },
+]
+
+export function passwordStrength(label = 'Password') {
+  return (value) => {
+    if (!value) return null
+    const missing = PASSWORD_RULES.filter((rule) => !rule.test(value)).map((rule) => rule.text)
+    if (missing.length) {
+      return `${label} needs ${missing.join(', ')}.`
+    }
+    return null
+  }
+}
+
+// `getOtherValue` is a function so it always reads the latest value of the
+// other field (e.g. the password) at the moment validation runs.
+export function matches(getOtherValue, message) {
+  return (value) => {
+    if (value && value !== getOtherValue()) {
+      return message
+    }
+    return null
+  }
+}
+
 /**
  * Runs an array of validator functions against a value and returns the
  * first error message found, or null if all pass.

@@ -6,7 +6,8 @@ const routes = [
   { path: '/recycling-hub', name: 'recycling-hub', component: () => import('../views/RecyclingHubView.vue') },
   { path: '/learning-centre', name: 'learning-centre', component: () => import('../views/LearningCentreView.vue') },
   { path: '/get-involved', name: 'get-involved', component: () => import('../views/GetInvolvedView.vue') },
-  { path: '/contact', name: 'contact', component: () => import('../views/ContactView.vue') }
+  { path: '/contact', name: 'contact', component: () => import('../views/ContactView.vue') },
+  { path: '/login', name: 'login', component: () => import('../views/LoginView.vue') }
 ]
 
 const router = createRouter({
