@@ -43,7 +43,6 @@ const errors = reactive({
 })
 
 const formError = ref(null)
-const successMessage = ref(null)
 const isSubmitting = ref(false)
 
 // Login only checks that fields are filled in. The strength rules apply when
@@ -149,17 +148,13 @@ async function submitForm() {
     return
   }
 
-  successMessage.value =
-    mode.value === 'login' ? 'Welcome back!' : 'Your account has been created.'
   resetForm()
-
-  const redirect = safeRedirect(route.query.redirect)
-  if (redirect) router.push(redirect)
+  // Go back to the page the guard sent them from, or to their dashboard.
+  router.push(safeRedirect(route.query.redirect) ?? { name: 'dashboard' })
 }
 
 function handleLogout() {
   logout()
-  successMessage.value = null
   switchMode('login')
 }
 </script>
@@ -180,7 +175,6 @@ function handleLogout() {
     <div class="container-app auth-wrap">
       <div v-if="isAuthenticated" class="crate-card auth-card">
         <span class="crate-card__tag">SIGNED IN</span>
-        <p v-if="successMessage" class="form-success" role="status">{{ successMessage }}</p>
         <p class="auth-card__who">
           You're signed in as <strong>{{ currentUser.name }}</strong>,
           <span class="auth-card__role">{{ ROLE_LABELS[currentUser.role] }}</span>
