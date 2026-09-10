@@ -1,6 +1,21 @@
 # reloop-melbourne
 
-This template should help get you started developing with Vue 3 in Vite.
+ReLoop Melbourne is a Vue 3 web app for a fictional Melbourne not-for-profit working on
+recycling and the circular economy (FIT5032 assignment project).
+
+## Demo accounts
+
+The three seed accounts all use the password `Passw0rd!`. You can also register a new
+Community Member or Volunteer account from the Log in page.
+
+| Role             | Email             |
+| ---------------- | ----------------- |
+| Community Member | priya@example.com |
+| Volunteer        | jack@example.com  |
+| Administrator    | admin@example.com |
+
+This version has no server: accounts, the login session and ratings are stored in the
+browser's localStorage. Passwords are stored as salted PBKDF2 hashes, never as plain text.
 
 ## Recommended IDE Setup
 
