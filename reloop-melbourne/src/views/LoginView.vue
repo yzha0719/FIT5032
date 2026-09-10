@@ -5,6 +5,7 @@ import { useAuth, ROLE_LABELS, SELF_SERVICE_ROLES } from '../composables/useAuth
 import {
   required,
   minLength,
+  maxLength,
   email as emailValidator,
   passwordStrength,
   matches,
@@ -53,9 +54,9 @@ const loginRules = {
 }
 
 const registerRules = {
-  name: [required('Full name'), minLength('Full name', 2)],
-  email: [required('Email'), emailValidator()],
-  password: [required('Password'), passwordStrength()],
+  name: [required('Full name'), minLength('Full name', 2), maxLength('Full name', 80)],
+  email: [required('Email'), emailValidator(), maxLength('Email', 254)],
+  password: [required('Password'), passwordStrength(), maxLength('Password', 128)],
   confirmPassword: [
     required('Confirm password'),
     matches(() => form.password, 'Passwords do not match.'),

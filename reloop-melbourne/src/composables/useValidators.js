@@ -22,6 +22,15 @@ export function minLength(label, min) {
   }
 }
 
+export function maxLength(label, max) {
+  return (value) => {
+    if (value && String(value).length > max) {
+      return `${label} must be ${max} characters or fewer.`
+    }
+    return null
+  }
+}
+
 export function email(label = 'Email') {
   return (value) => {
     if (value && !EMAIL_RE.test(value)) {
