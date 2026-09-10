@@ -7,6 +7,13 @@ import { useLocalStorageState } from './useLocalStorageState'
 // so nobody can give themselves admin rights through the register form.
 export const SELF_SERVICE_ROLES = ['member', 'volunteer']
 
+// Display names for each role, shared by the navbar, login page and dashboards.
+export const ROLE_LABELS = {
+  member: 'Community Member',
+  volunteer: 'Volunteer',
+  admin: 'Administrator',
+}
+
 // Module-level state: created once when this file is first imported, so every
 // component that calls useAuth() shares the same login state.
 const registeredUsers = useLocalStorageState('reloop:registered-users', [])

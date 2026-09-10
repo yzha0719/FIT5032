@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { useRoute } from 'vue-router'
+import AccountNav from './AccountNav.vue'
 
 const isOpen = ref(false)
 const route = useRoute()
@@ -25,6 +26,12 @@ function closeMenu() {
 
 <template>
   <header class="site-nav bg-ink">
+    <div class="site-nav__account-bar">
+      <div class="container-app">
+        <AccountNav variant="bar" />
+      </div>
+    </div>
+
     <div class="container-app site-nav__bar">
       <router-link to="/" class="site-nav__brand" @click="closeMenu">
         <span class="site-nav__brand-mark">ReLoop</span>
@@ -58,6 +65,7 @@ function closeMenu() {
         <router-link to="/get-involved" class="btn-reloop btn-reloop--primary btn-reloop--sm site-nav__cta" @click="closeMenu">
           Donate
         </router-link>
+        <AccountNav variant="menu" class="site-nav__account-menu" @navigate="closeMenu" />
       </nav>
     </div>
   </header>
@@ -136,7 +144,14 @@ function closeMenu() {
 }
 
 .site-nav__links.is-open {
-  max-height: 480px;
+  /* Tall enough for the account section too; scrolls on very short screens */
+  max-height: calc(100vh - 4rem);
+  overflow-y: auto;
+}
+
+.site-nav__account-bar {
+  display: none;
+  border-bottom: 1px solid rgba(237, 238, 228, 0.12);
 }
 
 .site-nav__link {
@@ -158,6 +173,16 @@ function closeMenu() {
 
 @media (min-width: 992px) {
   .site-nav__toggle {
+    display: none;
+  }
+
+  /* Account links move out of the menu into their own bar, so the main nav
+     row doesn't overflow between 992px and 1400px */
+  .site-nav__account-bar {
+    display: block;
+  }
+
+  .site-nav__links .site-nav__account-menu {
     display: none;
   }
 

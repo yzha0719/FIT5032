@@ -1,72 +1,17 @@
 <script setup>
 import { reactive, ref } from 'vue'
-import { useLocalStorageState } from '../composables/useLocalStorageState'
+import { useAuth } from '../composables/useAuth'
 import {
   required,
-  minLength,
   email as emailValidator,
   numberRange,
   runValidators,
 } from '../composables/useValidators'
 
-/* Volunteer sign-up form — validation types: required, minLength, email */
-const volunteerForm = reactive({
-  fullName: '',
-  email: '',
-  interestArea: '',
-  message: '',
-})
-
-const volunteerErrors = reactive({
-  fullName: null,
-  email: null,
-  interestArea: null,
-})
-
-const volunteerSubmitted = ref(false)
-const volunteerSignup = useLocalStorageState('reloop:volunteer-signup', null)
+/* Volunteering goes through a volunteer account (BR C.2), so there is one way
+   to sign up instead of a separate form on this page. */
+const { currentUser, isAuthenticated, hasRole } = useAuth()
 const interestAreas = ['Repair café', 'Swap meets & events', 'Schools program', 'Admin & comms']
-
-function validateVolunteerField(field) {
-  if (field === 'fullName') {
-    volunteerErrors.fullName = runValidators(volunteerForm.fullName, [
-      required('Full name'),
-      minLength('Full name', 2),
-    ])
-  }
-  if (field === 'email') {
-    volunteerErrors.email = runValidators(volunteerForm.email, [
-      required('Email'),
-      emailValidator(),
-    ])
-  }
-  if (field === 'interestArea') {
-    volunteerErrors.interestArea = runValidators(volunteerForm.interestArea, [
-      required('Interest area'),
-    ])
-  }
-}
-
-function submitVolunteerForm() {
-  validateVolunteerField('fullName')
-  validateVolunteerField('email')
-  validateVolunteerField('interestArea')
-
-  const hasErrors = Object.values(volunteerErrors).some(Boolean)
-  if (hasErrors) return
-
-  volunteerSignup.value = {
-    fullName: volunteerForm.fullName,
-    interestArea: volunteerForm.interestArea,
-    submittedAt: new Date().toISOString(),
-  }
-  volunteerSubmitted.value = true
-  volunteerForm.fullName = ''
-  volunteerForm.email = ''
-  volunteerForm.interestArea = ''
-  volunteerForm.message = ''
-  Object.keys(volunteerErrors).forEach((key) => (volunteerErrors[key] = null))
-}
 
 /* Donation form — validation types: required, email, numberRange */
 const donationForm = reactive({
@@ -130,65 +75,48 @@ function submitDonationForm() {
     <div class="container-app two-col">
       <div class="crate-card form-card">
         <span class="crate-card__tag">VOLUNTEER</span>
-        <h2 class="form-card__title">Sign up to volunteer</h2>
+        <h2 class="form-card__title">Volunteer with us</h2>
 
-        <p v-if="volunteerSubmitted" class="form-success">
-          Thanks — we've saved your details and a coordinator will be in touch about your first
-          session.
-        </p>
-
-        <form novalidate @submit.prevent="submitVolunteerForm">
-          <div class="field" :class="{ 'has-error': volunteerErrors.fullName }">
-            <label for="volunteer-name">Full name</label>
-            <input
-              id="volunteer-name"
-              v-model="volunteerForm.fullName"
-              type="text"
-              @blur="validateVolunteerField('fullName')"
-            />
-            <span v-if="volunteerErrors.fullName" class="field__error">{{
-              volunteerErrors.fullName
-            }}</span>
-          </div>
-
-          <div class="field" :class="{ 'has-error': volunteerErrors.email }">
-            <label for="volunteer-email">Email</label>
-            <input
-              id="volunteer-email"
-              v-model="volunteerForm.email"
-              type="email"
-              @blur="validateVolunteerField('email')"
-            />
-            <span v-if="volunteerErrors.email" class="field__error">{{
-              volunteerErrors.email
-            }}</span>
-          </div>
-
-          <div class="field" :class="{ 'has-error': volunteerErrors.interestArea }">
-            <label for="volunteer-area">Where would you like to help?</label>
-            <select
-              id="volunteer-area"
-              v-model="volunteerForm.interestArea"
-              @blur="validateVolunteerField('interestArea')"
-            >
-              <option value="" disabled>Choose an area</option>
-              <option v-for="area in interestAreas" :key="area" :value="area">{{ area }}</option>
-            </select>
-            <span v-if="volunteerErrors.interestArea" class="field__error">{{
-              volunteerErrors.interestArea
-            }}</span>
-          </div>
-
-          <div class="field">
-            <label for="volunteer-message">Anything we should know? (optional)</label>
-            <textarea id="volunteer-message" v-model="volunteerForm.message" rows="3"></textarea>
-          </div>
-
-          <button type="submit" class="btn-reloop btn-reloop--primary">Join as a volunteer</button>
-          <p v-if="volunteerSignup" class="form-card__count">
-            You're signed up as a volunteer for "{{ volunteerSignup.interestArea }}" — see you soon.
+        <template v-if="hasRole('volunteer')">
+          <p>
+            You're registered as a volunteer, {{ currentUser.name }}. Thanks for being part of the
+            crew.
           </p>
-        </form>
+          <router-link :to="{ name: 'volunteer-shifts' }" class="btn-reloop btn-reloop--primary">
+            See volunteer shifts
+          </router-link>
+        </template>
+
+        <template v-else>
+          <p>
+            Volunteers keep our repair cafés, swap meets and school sessions running. No experience
+            needed. You can help with:
+          </p>
+          <ul class="volunteer-areas">
+            <li v-for="area in interestAreas" :key="area">{{ area }}</li>
+          </ul>
+
+          <template v-if="!isAuthenticated">
+            <router-link
+              :to="{ name: 'login', query: { mode: 'register', role: 'volunteer' } }"
+              class="btn-reloop btn-reloop--primary"
+            >
+              Create a volunteer account
+            </router-link>
+            <p class="form-card__count">
+              Already have an account?
+              <router-link :to="{ name: 'login', query: { redirect: '/get-involved' } }"
+                >Log in</router-link
+              >
+            </p>
+          </template>
+
+          <p v-else-if="hasRole('member')" class="form-card__count">
+            You're signed in with a Community Member account. Want to volunteer too?
+            <router-link to="/contact">Get in touch</router-link> and we'll switch your account
+            over.
+          </p>
+        </template>
       </div>
 
       <div class="crate-card form-card">
@@ -280,6 +208,13 @@ function submitDonationForm() {
   font-size: 0.8rem;
   color: var(--ink-soft);
   margin: 0.9rem 0 0;
+}
+
+.volunteer-areas {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0 0 1.5rem;
+  padding-left: 1.2rem;
 }
 
 @media (min-width: 992px) {

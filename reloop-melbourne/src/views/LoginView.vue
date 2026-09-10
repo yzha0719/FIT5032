@@ -1,7 +1,7 @@
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useAuth, SELF_SERVICE_ROLES } from '../composables/useAuth'
+import { useAuth, ROLE_LABELS, SELF_SERVICE_ROLES } from '../composables/useAuth'
 import {
   required,
   minLength,
@@ -16,19 +16,15 @@ const route = useRoute()
 const router = useRouter()
 const { currentUser, isAuthenticated, login, register, logout } = useAuth()
 
-const roleLabels = {
-  member: 'Community Member',
-  volunteer: 'Volunteer',
-  admin: 'Administrator',
-}
-
 const roleDescriptions = {
   member: 'Find recycling help, book events and rate the ones you attend.',
   volunteer: 'Sign up for repair café and swap meet shifts and track your sessions.',
 }
 
-/* One screen for both forms, so nobody has to hunt for a separate register page */
-const mode = ref('login') // 'login' | 'register'
+/* One screen for both forms, so nobody has to hunt for a separate register page.
+   The mode lives in the URL (?mode=register), so a link from another page can
+   open the register form directly. */
+const mode = computed(() => (route.query.mode === 'register' ? 'register' : 'login'))
 
 const form = reactive({
   name: '',
@@ -83,12 +79,35 @@ function clearErrors() {
   formError.value = null
 }
 
+// The buttons only change the URL; `mode` follows it. Keeping the URL as the
+// single source means the tab buttons and links like "Create account" in the
+// navbar can never disagree about which form is showing.
 function switchMode(nextMode) {
-  mode.value = nextMode
+  const query = { ...route.query }
+  if (nextMode === 'register') {
+    query.mode = 'register'
+  } else {
+    delete query.mode
+  }
+  router.replace({ query })
+}
+
+// Whenever the form changes (by button or by link), drop typed passwords and old errors.
+watch(mode, () => {
   form.password = ''
   form.confirmPassword = ''
   clearErrors()
-}
+})
+
+// ?role=volunteer pre-selects the account type. It is checked against the
+// whitelist, so ?role=admin is ignored.
+watch(
+  () => route.query.role,
+  (role) => {
+    if (SELF_SERVICE_ROLES.includes(role)) form.role = role
+  },
+  { immediate: true },
+)
 
 function resetForm() {
   form.name = ''
@@ -164,7 +183,7 @@ function handleLogout() {
         <p v-if="successMessage" class="form-success" role="status">{{ successMessage }}</p>
         <p class="auth-card__who">
           You're signed in as <strong>{{ currentUser.name }}</strong>,
-          <span class="auth-card__role">{{ roleLabels[currentUser.role] }}</span>
+          <span class="auth-card__role">{{ ROLE_LABELS[currentUser.role] }}</span>
         </p>
         <button type="button" class="btn-reloop btn-reloop--outline" @click="handleLogout">
           Log out
@@ -280,7 +299,7 @@ function handleLogout() {
                     :value="role"
                     @change="validateField('role')"
                   />
-                  <span class="role-option__label">{{ roleLabels[role] }}</span>
+                  <span class="role-option__label">{{ ROLE_LABELS[role] }}</span>
                   <span class="role-option__desc">{{ roleDescriptions[role] }}</span>
                 </label>
               </div>
