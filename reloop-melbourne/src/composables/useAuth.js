@@ -50,13 +50,16 @@ const allUsers = computed(() => [
   ...registeredUsers.value.filter(isValidRegisteredUser),
 ])
 
+// Never expose the salt or hash to the rest of the app.
+function toPublicUser(user) {
+  const { salt: _salt, passwordHash: _passwordHash, ...publicFields } = user
+  return publicFields
+}
+
 const currentUser = computed(() => {
   if (!session.value) return null
   const user = allUsers.value.find((u) => u.id === session.value.userId)
-  if (!user) return null
-  // Never expose the salt or hash to the rest of the app.
-  const { salt: _salt, passwordHash: _passwordHash, ...publicFields } = user
-  return publicFields
+  return user ? toPublicUser(user) : null
 })
 
 const isAuthenticated = computed(() => currentUser.value !== null)
@@ -180,6 +183,17 @@ function hasRole(...roles) {
   return isAuthenticated.value && roles.includes(currentUser.value.role)
 }
 
+// Account list for the admin page. Returns an empty list unless an admin is
+// logged in, so other pages can't use it to read everyone's details.
+function listUsers() {
+  if (!hasRole('admin')) return []
+  const seedIds = new Set(seedUsers.map((user) => user.id))
+  return allUsers.value.map((user) => ({
+    ...toPublicUser(user),
+    isSeedAccount: seedIds.has(user.id),
+  }))
+}
+
 export function useAuth() {
-  return { currentUser, isAuthenticated, login, register, logout, hasRole }
+  return { currentUser, isAuthenticated, login, register, logout, hasRole, listUsers }
 }
