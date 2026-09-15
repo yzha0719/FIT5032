@@ -1,11 +1,12 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 import AboutView from '../views/AboutView.vue'
-import LoginView from '../views/LoginView.vue'
 import AccessDeniedView from '../views/AccessDeniedView.vue'
 import { useAuth } from '../stores/auth'
 import FirebaseSigninView from '../views/FirebaseSigninView.vue'
 import FirebaseRegisterView from '../views/FirebaseRegisterView.vue'
+import AdminView from '../views/AdminView.vue'
+import LogoutView from '../views/LogoutView.vue'
 
 const routes = [
   {
@@ -20,9 +21,9 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
+    // The old hardcoded login has been replaced by Firebase sign in
     path: '/login',
-    name: 'Login',
-    component: LoginView
+    redirect: '/FireLogin'
   },
   {
     path: '/access-denied',
@@ -38,6 +39,18 @@ const routes = [
     path: '/FireLogin',
     name: 'FireLogin',
     component: FirebaseSigninView
+  },
+  {
+    path: '/admin',
+    name: 'Admin',
+    component: AdminView,
+    meta: { requiresAuth: true, role: 'admin' }
+  },
+  {
+    path: '/logout',
+    name: 'Logout',
+    component: LogoutView,
+    meta: { requiresAuth: true }
   }
 ]
 
@@ -46,11 +59,18 @@ const router = createRouter({
   routes
 })
 
-router.beforeEach((to) => {
-  const { isAuthenticated } = useAuth()
+router.beforeEach(async (to) => {
+  const { isAuthenticated, role, authReady } = useAuth()
+
+  // Wait for Firebase to restore the session on a page refresh
+  await authReady
 
   if (to.meta.requiresAuth && !isAuthenticated.value) {
-    return { name: 'Login', query: { redirect: to.fullPath } }
+    return { name: 'FireLogin', query: { redirect: to.fullPath } }
+  }
+
+  if (to.meta.role && role.value !== to.meta.role) {
+    return { name: 'AccessDenied' }
   }
 })
 
