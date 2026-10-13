@@ -116,7 +116,7 @@ const featuredPosts = blogPosts.slice(0, 2)
     <div class="container-app">
       <div class="section-heading">
         <h2>Workshops &amp; swap events</h2>
-        <router-link to="/get-involved" class="section-heading__link">See all &rarr;</router-link>
+        <router-link to="/events" class="section-heading__link">See all &rarr;</router-link>
       </div>
       <div v-if="featuredEvents.length" class="card-grid">
         <article v-for="event in featuredEvents" :key="event.id" class="crate-card">

@@ -9,7 +9,8 @@ const route = useRoute()
 const links = [
   { to: '/', label: 'Home' },
   { to: '/about', label: 'About Us' },
-  { to: '/recycling-hub', label: 'Recycling & Waste Hub' },
+  { to: '/recycling-hub', label: 'Recycling Hub' },
+  { to: '/events', label: 'Events' },
   { to: '/learning-centre', label: 'Learning Centre' },
   { to: '/get-involved', label: 'Get Involved' },
   { to: '/contact', label: 'Contact' }
