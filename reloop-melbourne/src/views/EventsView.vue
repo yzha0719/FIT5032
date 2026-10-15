@@ -79,6 +79,7 @@ const columns = [
         :columns="columns"
         caption="Workshops and events, with ratings and spots left"
         row-noun="events"
+        export-name="reloop-events"
         default-sort-key="date"
         default-sort-direction="desc"
         empty-text="No events match your search. Try a different suburb or category."

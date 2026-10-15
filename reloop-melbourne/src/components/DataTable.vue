@@ -1,9 +1,10 @@
 <script setup>
 import { computed, reactive, ref, useId, watch } from 'vue'
+import { useExport } from '../composables/useExport'
 
-// Reusable table with sortable columns, a search box per column and
-// pagination. Pages pass their own column definitions and may override any
-// cell with a slot named `cell-<key>` (BR D.3).
+// Reusable table with sortable columns, a search box per column, pagination
+// and CSV/PDF export (BR D.3, E.4). Pages pass their own column definitions
+// and may override any cell with a slot named `cell-<key>`.
 //
 // A column looks like:
 //   { key, label, sortable, searchable, nowrap,
@@ -20,7 +21,11 @@ const props = defineProps({
   // Which column the table is sorted by before anyone clicks a header.
   defaultSortKey: { type: String, default: null },
   defaultSortDirection: { type: String, default: 'asc' },
+  // Base name for downloaded files. No name, no export buttons.
+  exportName: { type: String, default: '' },
 })
+
+const { exportCsv, exportPdf } = useExport()
 
 // Unique ids for the search inputs, so two tables on one page don't clash.
 const idBase = useId()
@@ -115,11 +120,64 @@ function sortIcon(column) {
   if (sortKey.value !== column.key) return '↕'
   return sortDirection.value === 'asc' ? '▲' : '▼'
 }
+
+/* BR E.4: export what is on screen — every matching row in the current sort
+   order, not just the visible page and not the unfiltered data. */
+
+const exportHeaders = computed(() => props.columns.map((column) => column.label))
+
+function exportRows() {
+  return sortedRows.value.map((row) => props.columns.map((column) => cellValue(row, column)))
+}
+
+const canExport = computed(() => Boolean(props.exportName) && sortedRows.value.length > 0)
+
+function downloadCsv() {
+  exportCsv({ name: props.exportName, headers: exportHeaders.value, rows: exportRows() })
+}
+
+// The PDF library is loaded on demand, so this takes a moment the first time.
+const isPreparingPdf = ref(false)
+
+async function downloadPdf() {
+  isPreparingPdf.value = true
+  try {
+    await exportPdf({
+      name: props.exportName,
+      title: props.caption,
+      subtitle: summary.value.replace('Showing', 'Includes').replace(/\.$/, ''),
+      headers: exportHeaders.value,
+      rows: exportRows(),
+    })
+  } finally {
+    isPreparingPdf.value = false
+  }
+}
 </script>
 
 <template>
   <div class="data-table">
-    <p class="data-table__summary" role="status">{{ summary }}</p>
+    <div class="data-table__toolbar">
+      <p class="data-table__summary" role="status">{{ summary }}</p>
+      <div v-if="exportName" class="data-table__exports">
+        <button
+          type="button"
+          class="btn-reloop btn-reloop--outline btn-reloop--sm"
+          :disabled="!canExport"
+          @click="downloadCsv"
+        >
+          Export CSV
+        </button>
+        <button
+          type="button"
+          class="btn-reloop btn-reloop--outline btn-reloop--sm"
+          :disabled="!canExport || isPreparingPdf"
+          @click="downloadPdf"
+        >
+          {{ isPreparingPdf ? 'Preparing…' : 'Export PDF' }}
+        </button>
+      </div>
+    </div>
 
     <!-- Focusable so keyboard users can scroll the table sideways on a phone -->
     <div class="table-wrap" tabindex="0" role="region" :aria-label="caption">
@@ -193,11 +251,26 @@ function sortIcon(column) {
 </template>
 
 <style scoped>
+.data-table__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.5rem;
+}
+
 .data-table__summary {
-  margin: 0 0 0.5rem;
+  margin: 0;
   font-family: var(--font-mono);
   font-size: 0.8rem;
   color: var(--ink-soft);
+}
+
+.data-table__exports {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
 .table-wrap {

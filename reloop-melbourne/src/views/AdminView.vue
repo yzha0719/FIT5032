@@ -239,6 +239,7 @@ const ratingColumns = [
           :columns="accountColumns"
           caption="All accounts with their role and the date they joined"
           row-noun="accounts"
+          export-name="reloop-accounts"
           default-sort-key="name"
           empty-text="No accounts match your search."
         >
@@ -255,6 +256,7 @@ const ratingColumns = [
           :columns="ratingColumns"
           caption="Past events with their average rating and number of ratings"
           row-noun="events"
+          export-name="reloop-event-ratings"
           default-sort-key="date"
           default-sort-direction="desc"
           empty-text="No events match your search."
