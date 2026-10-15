@@ -1,6 +1,15 @@
-import { computed } from 'vue'
-import { users as seedUsers } from '../data/users'
-import { useLocalStorageState } from './useLocalStorageState'
+import { computed, ref } from 'vue'
+import {
+  createUserWithEmailAndPassword,
+  GoogleAuthProvider,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+  signOut,
+  updateProfile,
+} from 'firebase/auth'
+import { collection, doc, getDoc, getDocs, serverTimestamp, setDoc } from 'firebase/firestore'
+import { auth, db } from '../firebase'
 import {
   required,
   minLength,
@@ -9,11 +18,10 @@ import {
   passwordStrength,
   runValidators,
 } from './useValidators'
-import { createSalt, hashPassword, verifyPassword } from '../utils/passwords'
 
-// Roles a visitor can pick for themselves when registering.
-// 'admin' is deliberately left out: admin accounts only exist in the seed data,
-// so nobody can give themselves admin rights through the register form.
+// Roles a visitor can pick for themselves when registering. 'admin' is left
+// out on purpose: the Firestore rules reject it too, so an admin account can
+// only be set up from the Firebase console.
 export const SELF_SERVICE_ROLES = ['member', 'volunteer']
 
 // Display names for each role, shared by the navbar, login page and dashboards.
@@ -23,118 +31,114 @@ export const ROLE_LABELS = {
   admin: 'Administrator',
 }
 
-// Module-level state: created once when this file is first imported, so every
-// component that calls useAuth() shares the same login state.
-const registeredUsers = useLocalStorageState('reloop:registered-users', [])
-
-// The session only stores the user's id. Name and role are always looked up
-// from the user list, so editing localStorage to change "role" has no effect.
-const session = useLocalStorageState('reloop:session', null)
-
-// localStorage can be edited in DevTools, so only accept stored accounts that
-// register() could have created: a self-service role and a hashed password.
-// A hand-added { role: 'admin' } record, or an old record with a plain-text
-// password, is ignored. Admin accounts can only come from the seed data.
-function isValidRegisteredUser(user) {
-  return (
-    typeof user?.id === 'string' &&
-    typeof user.email === 'string' &&
-    typeof user.salt === 'string' &&
-    typeof user.passwordHash === 'string' &&
-    SELF_SERVICE_ROLES.includes(user.role)
-  )
-}
-
-const allUsers = computed(() => [
-  ...seedUsers,
-  ...registeredUsers.value.filter(isValidRegisteredUser),
-])
-
-// Never expose the salt or hash to the rest of the app.
-function toPublicUser(user) {
-  const { salt: _salt, passwordHash: _passwordHash, ...publicFields } = user
-  return publicFields
-}
-
-const currentUser = computed(() => {
-  if (!session.value) return null
-  const user = allUsers.value.find((u) => u.id === session.value.userId)
-  return user ? toPublicUser(user) : null
-})
-
+// Module-level state, so every component shares one copy of the logged-in user.
+// Shape stays the same as the old local version ({ id, name, email, role }),
+// which is why the rest of the app didn't need rewriting.
+const currentUser = ref(null)
 const isAuthenticated = computed(() => currentUser.value !== null)
 
-function normaliseEmail(value) {
-  return String(value ?? '')
-    .trim()
-    .toLowerCase()
+// Firebase restores the signed-in user asynchronously after a page load, so
+// anything that depends on "am I logged in?" has to wait for the first answer.
+let markReady
+const authReady = new Promise((resolve) => {
+  markReady = resolve
+})
+
+export function waitForAuth() {
+  return authReady
 }
 
-function findUserByEmail(email) {
-  const target = normaliseEmail(email)
-  return allUsers.value.find((u) => normaliseEmail(u.email) === target)
-}
+// Someone signing in with Google has no profile document yet. Create one with
+// the lowest role; the rules only accept member or volunteer here.
+async function ensureProfile(firebaseUser) {
+  const profileRef = doc(db, 'users', firebaseUser.uid)
+  const snapshot = await getDoc(profileRef)
+  if (snapshot.exists()) return snapshot.data()
 
-/* Slowing down repeated guesses */
-
-// Failed logins per email, kept in memory. After MAX_ATTEMPTS wrong tries that
-// email is locked for LOCK_MS. A page refresh clears this, so it slows down
-// casual guessing rather than stopping a determined attacker; that needs a server.
-const MAX_ATTEMPTS = 5
-const LOCK_MS = 30_000
-const failedLogins = new Map()
-
-function lockSecondsLeft(email) {
-  const lockedUntil = failedLogins.get(email)?.lockedUntil ?? 0
-  return Math.max(0, Math.ceil((lockedUntil - Date.now()) / 1000))
-}
-
-function recordFailedLogin(email) {
-  const entry = failedLogins.get(email) ?? { count: 0, lockedUntil: 0 }
-  entry.count += 1
-  if (entry.count >= MAX_ATTEMPTS) {
-    entry.count = 0
-    entry.lockedUntil = Date.now() + LOCK_MS
+  const profile = {
+    name: firebaseUser.displayName || firebaseUser.email.split('@')[0],
+    email: firebaseUser.email,
+    role: 'member',
+    createdAt: serverTimestamp(),
   }
-  failedLogins.set(email, entry)
+  await setDoc(profileRef, profile)
+  return profile
 }
 
-// Checked against when the email doesn't exist, so a wrong email takes as
-// long to reject as a wrong password and response time doesn't reveal which
-// emails have accounts.
-const DUMMY_SALT = '0'.repeat(32)
-const DUMMY_HASH = '0'.repeat(64)
+// Set while register() is still writing the new profile. Firebase reports the
+// new account as signed in the moment it is created, which is before the name
+// and role exist, so anything reading the profile waits for that write first.
+let pendingProfileWrite = null
+
+// Loads the role from Firestore and publishes the user to the whole app.
+// login() awaits this too: signing in with Firebase resolves before the role
+// is known, and the route guard would otherwise still see a signed-out user.
+async function applyUser(firebaseUser) {
+  if (!firebaseUser) {
+    currentUser.value = null
+    return
+  }
+  if (pendingProfileWrite) {
+    await pendingProfileWrite
+  }
+  const profile = await ensureProfile(firebaseUser)
+  currentUser.value = {
+    id: firebaseUser.uid,
+    name: profile.name,
+    email: firebaseUser.email,
+    role: profile.role,
+  }
+}
+
+onAuthStateChanged(auth, async (firebaseUser) => {
+  await applyUser(firebaseUser)
+  markReady()
+})
+
+// Firebase error codes are not something to show a user. Wrong email and wrong
+// password share one message, so the form doesn't reveal which emails exist.
+function loginErrorMessage(code) {
+  switch (code) {
+    case 'auth/invalid-email':
+      return 'Please enter a valid email address.'
+    case 'auth/too-many-requests':
+      return 'Too many attempts. Please wait a moment and try again.'
+    case 'auth/network-request-failed':
+      return 'Could not reach the server. Check your connection and try again.'
+    default:
+      return 'Email or password is incorrect.'
+  }
+}
 
 async function login(email, password) {
-  const key = normaliseEmail(email)
-  const waitSeconds = lockSecondsLeft(key)
-  if (waitSeconds > 0) {
-    return {
-      ok: false,
-      error: `Too many attempts. Please wait ${waitSeconds} seconds and try again.`,
+  try {
+    const credential = await signInWithEmailAndPassword(
+      auth,
+      String(email).trim(),
+      String(password),
+    )
+    await applyUser(credential.user)
+    return { ok: true }
+  } catch (error) {
+    return { ok: false, error: loginErrorMessage(error.code) }
+  }
+}
+
+async function loginWithGoogle() {
+  try {
+    const credential = await signInWithPopup(auth, new GoogleAuthProvider())
+    await applyUser(credential.user)
+    return { ok: true }
+  } catch (error) {
+    if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
+      return { ok: false, error: 'Google sign-in was cancelled.' }
     }
+    return { ok: false, error: 'Google sign-in failed. Please try again or use your email.' }
   }
-
-  const user = findUserByEmail(key)
-  const passwordMatches = await verifyPassword(
-    String(password ?? ''),
-    user ? user.salt : DUMMY_SALT,
-    user ? user.passwordHash : DUMMY_HASH,
-  )
-
-  if (!user || !passwordMatches) {
-    recordFailedLogin(key)
-    // Same message for both cases, so the form doesn't reveal which emails exist.
-    return { ok: false, error: 'Email or password is incorrect.' }
-  }
-
-  failedLogins.delete(key)
-  session.value = { userId: user.id }
-  return { ok: true }
 }
 
 // The register form checks these too, but that only helps people using the
-// form. Checking again here means nothing reaches storage without passing the
+// form. Checking again here means nothing reaches Firebase without passing the
 // same rules, however register() is called.
 const registerRules = {
   name: [required('Full name'), minLength('Full name', 2), maxLength('Full name', 80)],
@@ -145,7 +149,9 @@ const registerRules = {
 async function register({ name, email, password, role }) {
   const fields = {
     name: String(name ?? '').trim(),
-    email: normaliseEmail(email),
+    email: String(email ?? '')
+      .trim()
+      .toLowerCase(),
     password: String(password ?? ''),
   }
 
@@ -156,44 +162,75 @@ async function register({ name, email, password, role }) {
   if (!SELF_SERVICE_ROLES.includes(role)) {
     return { ok: false, error: 'Please choose a valid account type.' }
   }
-  if (findUserByEmail(fields.email)) {
-    return { ok: false, error: 'An account with this email already exists.' }
-  }
 
-  // Only the salt and hash are saved. The plain password is never stored.
-  const salt = createSalt()
-  const newUser = {
-    id: crypto.randomUUID(),
-    name: fields.name,
-    email: fields.email,
-    salt,
-    passwordHash: await hashPassword(fields.password, salt),
-    role,
+  // Hold back the auth listener until the profile document exists, so it
+  // doesn't see a brand-new account with no profile and create a default one.
+  let finishProfileWrite
+  pendingProfileWrite = new Promise((resolve) => {
+    finishProfileWrite = resolve
+  })
+
+  try {
+    const credential = await createUserWithEmailAndPassword(auth, fields.email, fields.password)
+    await updateProfile(credential.user, { displayName: fields.name })
+    await setDoc(doc(db, 'users', credential.user.uid), {
+      name: fields.name,
+      email: fields.email,
+      role,
+      createdAt: serverTimestamp(),
+    })
+    finishProfileWrite()
+    pendingProfileWrite = null
+    await applyUser(credential.user)
+    return { ok: true }
+  } catch (error) {
+    finishProfileWrite()
+    pendingProfileWrite = null
+    if (error.code === 'auth/email-already-in-use') {
+      return { ok: false, error: 'An account with this email already exists.' }
+    }
+    if (error.code === 'auth/weak-password') {
+      return { ok: false, error: 'Please choose a stronger password.' }
+    }
+    return { ok: false, error: 'Could not create the account. Please try again.' }
   }
-  registeredUsers.value = [...registeredUsers.value, newUser]
-  session.value = { userId: newUser.id }
-  return { ok: true }
 }
 
 function logout() {
-  session.value = null
+  return signOut(auth)
 }
 
 function hasRole(...roles) {
   return isAuthenticated.value && roles.includes(currentUser.value.role)
 }
 
-// Account list for the admin page. Returns an empty list unless an admin is
-// logged in, so other pages can't use it to read everyone's details.
-function listUsers() {
+// Account list for the admin page. The Firestore rules only return the whole
+// collection to an admin, so this is checked on the server as well as here.
+async function fetchUsers() {
   if (!hasRole('admin')) return []
-  const seedIds = new Set(seedUsers.map((user) => user.id))
-  return allUsers.value.map((user) => ({
-    ...toPublicUser(user),
-    isSeedAccount: seedIds.has(user.id),
-  }))
+  const snapshot = await getDocs(collection(db, 'users'))
+  return snapshot.docs.map((entry) => {
+    const data = entry.data()
+    return {
+      id: entry.id,
+      name: data.name,
+      email: data.email,
+      role: data.role,
+      // serverTimestamp() is null for a moment right after a write.
+      createdAt: data.createdAt?.toDate?.() ?? null,
+    }
+  })
 }
 
 export function useAuth() {
-  return { currentUser, isAuthenticated, login, register, logout, hasRole, listUsers }
+  return {
+    currentUser,
+    isAuthenticated,
+    login,
+    loginWithGoogle,
+    register,
+    logout,
+    hasRole,
+    fetchUsers,
+  }
 }

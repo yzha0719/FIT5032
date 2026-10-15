@@ -1,15 +1,31 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import DataTable from '../components/DataTable.vue'
 import RatingSummary from '../components/RatingSummary.vue'
 import { useAuth, ROLE_LABELS } from '../composables/useAuth'
 import { useRatings } from '../composables/useRatings'
 import { events, isPastEvent } from '../data/events'
 
-const { listUsers } = useAuth()
+const { currentUser, fetchUsers } = useAuth()
 const { getSummary } = useRatings()
 
-const accounts = computed(() => listUsers())
+// Accounts now come from Firestore, so they arrive after the page renders.
+const accounts = ref([])
+const accountsError = ref(null)
+
+async function loadAccounts() {
+  try {
+    accounts.value = await fetchUsers()
+    accountsError.value = null
+  } catch {
+    accountsError.value = 'Could not load accounts. Check your connection and try again.'
+  }
+}
+
+onMounted(loadAccounts)
+// Reload if the signed-in user changes (for example after a page refresh
+// resolves the session).
+watch(currentUser, loadAccounts)
 
 // "1 Volunteer" but "2 Volunteers"
 function countLabel(count, singular) {
@@ -34,12 +50,9 @@ const totalRatings = computed(() =>
   ratedEvents.value.reduce((sum, event) => sum + event.summary.count, 0),
 )
 
-function formatEventDate(date) {
-  return new Date(date).toLocaleDateString('en-AU', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  })
+function formatDate(date) {
+  if (!date) return '—'
+  return date.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 const accountColumns = [
@@ -53,10 +66,12 @@ const accountColumns = [
     value: (row) => ROLE_LABELS[row.role],
   },
   {
-    key: 'source',
-    label: 'Account',
+    key: 'createdAt',
+    label: 'Joined',
     sortable: true,
-    value: (row) => (row.isSeedAccount ? 'Built-in' : 'Registered'),
+    nowrap: true,
+    value: (row) => formatDate(row.createdAt),
+    sortValue: (row) => row.createdAt?.getTime() ?? 0,
   },
 ]
 
@@ -67,7 +82,7 @@ const ratingColumns = [
     label: 'Date',
     sortable: true,
     nowrap: true,
-    value: (row) => formatEventDate(row.date),
+    value: (row) => new Date(row.date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }),
     sortValue: (row) => row.date,
   },
   { key: 'suburb', label: 'Suburb', sortable: true, searchable: true },
@@ -116,10 +131,11 @@ const ratingColumns = [
 
       <div class="admin-block">
         <h2 class="admin-heading">Accounts</h2>
+        <p v-if="accountsError" class="admin-error" role="alert">{{ accountsError }}</p>
         <DataTable
           :rows="accounts"
           :columns="accountColumns"
-          caption="All accounts with their role and whether they were registered on the site"
+          caption="All accounts with their role and the date they joined"
           row-noun="accounts"
           default-sort-key="name"
           empty-text="No accounts match your search."
@@ -175,6 +191,15 @@ const ratingColumns = [
 .admin-heading {
   font-size: 1.6rem;
   margin: 0 0 1rem;
+}
+
+.admin-error {
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  color: var(--reclaim-dark);
+  background-color: var(--paper);
+  border: 2px solid var(--reclaim);
+  border-radius: var(--radius);
 }
 
 .role-badge {

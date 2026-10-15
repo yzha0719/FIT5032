@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { useAuth } from '../composables/useAuth'
+import { useAuth, waitForAuth } from '../composables/useAuth'
 
 const routes = [
   { path: '/', name: 'home', component: () => import('../views/HomeView.vue') },
@@ -49,7 +49,10 @@ const router = createRouter({
 // Runs before every navigation, including typing a URL or refreshing the page.
 // Hiding links in the navbar is only a convenience; this is what actually stops
 // someone opening /admin without the admin role.
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
+  // Firebase restores the signed-in user asynchronously, so on a page refresh
+  // the guard has to wait for that before deciding anything.
+  await waitForAuth()
   const { isAuthenticated, hasRole } = useAuth()
 
   if (to.meta.requiresAuth && !isAuthenticated.value) {

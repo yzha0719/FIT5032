@@ -15,7 +15,7 @@ import {
 
 const route = useRoute()
 const router = useRouter()
-const { currentUser, isAuthenticated, login, register, logout } = useAuth()
+const { currentUser, isAuthenticated, login, loginWithGoogle, register, logout } = useAuth()
 
 const roleDescriptions = {
   member: 'Find recycling help, book events and rate the ones you attend.',
@@ -151,6 +151,21 @@ async function submitForm() {
 
   resetForm()
   // Go back to the page the guard sent them from, or to their dashboard.
+  router.push(safeRedirect(route.query.redirect) ?? { name: 'dashboard' })
+}
+
+// Google sign-in skips the form entirely: Firebase opens its own window and
+// hands back an account, so there is nothing of ours left to validate.
+async function handleGoogleLogin() {
+  formError.value = null
+  isSubmitting.value = true
+  const result = await loginWithGoogle()
+  isSubmitting.value = false
+
+  if (!result.ok) {
+    formError.value = result.error
+    return
+  }
   router.push(safeRedirect(route.query.redirect) ?? { name: 'dashboard' })
 }
 
@@ -313,6 +328,17 @@ function handleLogout() {
           >
             {{ mode === 'login' ? 'Log in' : 'Create account' }}
           </button>
+
+          <div class="auth-divider"><span>or</span></div>
+
+          <button
+            type="button"
+            class="btn-reloop btn-reloop--outline auth-submit"
+            :disabled="isSubmitting"
+            @click="handleGoogleLogin"
+          >
+            Continue with Google
+          </button>
         </form>
       </div>
     </div>
@@ -444,6 +470,25 @@ function handleLogout() {
 
 .auth-submit {
   width: 100%;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1rem 0;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid var(--kraft-dark);
 }
 
 .auth-card__who {

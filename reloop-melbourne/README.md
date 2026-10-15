@@ -14,8 +14,24 @@ Community Member or Volunteer account from the Log in page.
 | Volunteer        | jack@example.com  |
 | Administrator    | admin@example.com |
 
-This version has no server: accounts, the login session and ratings are stored in the
-browser's localStorage. Passwords are stored as salted PBKDF2 hashes, never as plain text.
+You can also sign in with Google.
+
+## Backend
+
+Authentication and account data run on Firebase (project `reloop-melbourne-78b45`):
+
+- **Firebase Authentication** handles sign-in, sign-up and sessions, so this app never
+  stores a password itself.
+- **Cloud Firestore** holds each account's profile at `users/{uid}`, including its role.
+  The role is read from there, never from anything the browser could edit.
+- **Security rules** are in [firestore.rules](firestore.rules): people can only read their
+  own profile (admins can read all), can only create their own, and can never change their
+  own role. The admin role is granted from the Firebase console.
+
+Ratings and volunteer shift sign-ups are still kept in the browser's localStorage.
+
+The Firebase config in `src/firebase.js` is not a secret: it identifies the project and is
+meant to ship with client code. Access is controlled by the rules above.
 
 ## Recommended IDE Setup
 
