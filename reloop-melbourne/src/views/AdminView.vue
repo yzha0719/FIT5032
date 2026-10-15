@@ -1,13 +1,53 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import DataTable from '../components/DataTable.vue'
 import RatingSummary from '../components/RatingSummary.vue'
 import { useAuth, ROLE_LABELS } from '../composables/useAuth'
+import { useEmail } from '../composables/useEmail'
 import { useRatings } from '../composables/useRatings'
 import { events, isPastEvent } from '../data/events'
+import { maxLength, minLength, required, runValidators } from '../composables/useValidators'
 
 const { currentUser, fetchUsers } = useAuth()
+const { emailMembers } = useEmail()
 const { getSummary } = useRatings()
+
+/* BR D.2: bulk email composer */
+
+const emailForm = reactive({ audience: 'volunteer', subject: '', message: '' })
+const emailErrors = reactive({ subject: null, message: null })
+const emailStatus = ref(null)
+const isSending = ref(false)
+
+const emailRules = {
+  subject: [required('Subject'), minLength('Subject', 4), maxLength('Subject', 120)],
+  message: [required('Message'), minLength('Message', 20), maxLength('Message', 4000)],
+}
+
+function validateEmailField(field) {
+  emailErrors[field] = runValidators(emailForm[field], emailRules[field])
+}
+
+async function sendBulkEmail() {
+  emailStatus.value = null
+  Object.keys(emailRules).forEach(validateEmailField)
+  if (Object.values(emailErrors).some(Boolean)) return
+
+  isSending.value = true
+  const result = await emailMembers({ ...emailForm })
+  isSending.value = false
+
+  if (!result.ok) {
+    emailStatus.value = { text: result.error, isError: true }
+    return
+  }
+  emailStatus.value = {
+    text: `Sent to ${result.recipients} ${result.recipients === 1 ? 'person' : 'people'}, with the recipient list attached as a CSV.`,
+    isError: false,
+  }
+  emailForm.subject = ''
+  emailForm.message = ''
+}
 
 // Accounts now come from Firestore, so they arrive after the page renders.
 const accounts = ref([])
@@ -130,6 +170,68 @@ const ratingColumns = [
       </div>
 
       <div class="admin-block">
+        <h2 class="admin-heading">Email members</h2>
+        <div class="crate-card email-card">
+          <span class="crate-card__tag">BULK EMAIL</span>
+          <p
+            v-if="emailStatus"
+            class="email-status"
+            :class="{ 'is-error': emailStatus.isError }"
+            role="status"
+          >
+            {{ emailStatus.text }}
+          </p>
+
+          <form novalidate @submit.prevent="sendBulkEmail">
+            <div class="field">
+              <label for="email-audience">Send to</label>
+              <select id="email-audience" v-model="emailForm.audience">
+                <option value="volunteer">Volunteers</option>
+                <option value="member">Community members</option>
+                <option value="all">Everyone with an account</option>
+              </select>
+            </div>
+
+            <div class="field" :class="{ 'has-error': emailErrors.subject }">
+              <label for="email-subject">Subject</label>
+              <input
+                id="email-subject"
+                v-model="emailForm.subject"
+                type="text"
+                maxlength="120"
+                @blur="validateEmailField('subject')"
+              />
+              <span v-if="emailErrors.subject" class="field__error">{{ emailErrors.subject }}</span>
+            </div>
+
+            <div class="field" :class="{ 'has-error': emailErrors.message }">
+              <label for="email-message">Message</label>
+              <textarea
+                id="email-message"
+                v-model="emailForm.message"
+                rows="5"
+                maxlength="4000"
+                @blur="validateEmailField('message')"
+              ></textarea>
+              <span class="field__hint">
+                Everyone receives their own copy, with the recipient list attached as a CSV.
+              </span>
+              <span v-if="emailErrors.message" class="field__error">{{ emailErrors.message }}</span>
+            </div>
+
+            <button
+              type="submit"
+              class="btn-reloop btn-reloop--primary"
+              :disabled="isSending"
+              @mousedown.prevent
+            >
+              {{ isSending ? 'Sending…' : 'Send email' }}
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <div class="admin-block">
         <h2 class="admin-heading">Accounts</h2>
         <p v-if="accountsError" class="admin-error" role="alert">{{ accountsError }}</p>
         <DataTable
@@ -191,6 +293,26 @@ const ratingColumns = [
 .admin-heading {
   font-size: 1.6rem;
   margin: 0 0 1rem;
+}
+
+.email-card {
+  height: auto;
+  max-width: 48rem;
+  padding-top: 2rem;
+}
+
+.email-status {
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  color: var(--paper);
+  background-color: var(--loop);
+  border-radius: var(--radius);
+}
+
+.email-status.is-error {
+  color: var(--reclaim-dark);
+  background-color: var(--paper);
+  border: 2px solid var(--reclaim);
 }
 
 .admin-error {

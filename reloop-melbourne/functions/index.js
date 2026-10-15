@@ -1,0 +1,188 @@
+// Cloud Functions for ReLoop Melbourne (BR E.1), used to send email (BR D.2).
+//
+// Everything here runs on the server for one reason: the SendGrid API key must
+// never reach the browser. The key is stored in Secret Manager and injected at
+// run time, so it is not in the code, not in git, and not in the bundle.
+import { initializeApp } from 'firebase-admin/app'
+import { getFirestore } from 'firebase-admin/firestore'
+import { setGlobalOptions } from 'firebase-functions/v2'
+import { defineSecret } from 'firebase-functions/params'
+import { HttpsError, onCall } from 'firebase-functions/v2/https'
+import { logger } from 'firebase-functions'
+import sgMail from '@sendgrid/mail'
+
+const SENDGRID_API_KEY = defineSecret('SENDGRID_API_KEY')
+
+// The address verified in SendGrid as a Single Sender.
+const FROM_EMAIL = 'yimingzhangcn@gmail.com'
+const FROM_NAME = 'ReLoop Melbourne'
+
+// Same region as Firestore, so a function reading the database doesn't cross
+// regions on every call.
+setGlobalOptions({ region: 'australia-southeast1', maxInstances: 5 })
+
+initializeApp()
+const db = getFirestore()
+
+/* Helpers */
+
+function requireSignedIn(request) {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Please log in first.')
+  }
+  return request.auth
+}
+
+// The caller's role comes from Firestore, never from the request, so a user
+// can't claim to be an admin by editing what the browser sends.
+async function roleOf(uid) {
+  const snapshot = await db.collection('users').doc(uid).get()
+  return snapshot.exists ? snapshot.data().role : null
+}
+
+function cleanText(value, { max, label }) {
+  const text = String(value ?? '').trim()
+  if (!text) throw new HttpsError('invalid-argument', `${label} is required.`)
+  if (text.length > max) {
+    throw new HttpsError('invalid-argument', `${label} must be ${max} characters or fewer.`)
+  }
+  return text
+}
+
+// Quotes a CSV field so commas, quotes and line breaks can't break the file
+// or inject a formula into a spreadsheet.
+function csvCell(value) {
+  const text = String(value ?? '')
+  const guarded = /^[=+\-@]/.test(text) ? `'${text}` : text
+  return `"${guarded.replace(/"/g, '""')}"`
+}
+
+function toCsv(headers, rows) {
+  const lines = [headers.map(csvCell).join(',')]
+  for (const row of rows) {
+    lines.push(row.map(csvCell).join(','))
+  }
+  return lines.join('\r\n')
+}
+
+function asAttachment(filename, text) {
+  return {
+    filename,
+    type: 'text/csv',
+    disposition: 'attachment',
+    content: Buffer.from(text, 'utf8').toString('base64'),
+  }
+}
+
+// Plain text keeps the HTML escaping problem out of the email entirely.
+function textToHtml(text) {
+  const escaped = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+  return escaped
+    .split(/\n{2,}/)
+    .map((paragraph) => `<p>${paragraph.replace(/\n/g, '<br>')}</p>`)
+    .join('')
+}
+
+/* BR D.2: a volunteer emails themselves a copy of their shifts, as a CSV */
+
+export const emailMyShifts = onCall({ secrets: [SENDGRID_API_KEY] }, async (request) => {
+  const auth = requireSignedIn(request)
+  const role = await roleOf(auth.uid)
+  if (role !== 'volunteer' && role !== 'admin') {
+    throw new HttpsError('permission-denied', 'Only volunteers can email a shift summary.')
+  }
+
+  const shifts = Array.isArray(request.data?.shifts) ? request.data.shifts : []
+  if (!shifts.length) {
+    throw new HttpsError('invalid-argument', 'There are no shifts to send.')
+  }
+  if (shifts.length > 50) {
+    throw new HttpsError('invalid-argument', 'Too many shifts in one email.')
+  }
+
+  const rows = shifts.slice(0, 50).map((shift) => [
+    String(shift?.date ?? '').slice(0, 40),
+    String(shift?.event ?? '').slice(0, 120),
+    String(shift?.task ?? '').slice(0, 120),
+    String(shift?.start ?? '').slice(0, 10),
+    String(shift?.end ?? '').slice(0, 10),
+  ])
+  const csv = toCsv(['Date', 'Event', 'Task', 'Start', 'End'], rows)
+
+  const lines = rows.map((row) => `• ${row[0]}, ${row[3]}–${row[4]} — ${row[2]} (${row[1]})`)
+  const body = [
+    `Hi ${request.auth.token.name || 'there'},`,
+    `Here are the ${rows.length} volunteer shift${rows.length === 1 ? '' : 's'} you're booked for.`,
+    lines.join('\n'),
+    'The attached CSV opens in Excel or Google Sheets, and you can import it into a calendar app.',
+    'Thanks for helping out,\nReLoop Melbourne',
+  ].join('\n\n')
+
+  sgMail.setApiKey(SENDGRID_API_KEY.value())
+  // The address comes from the verified auth token, so nobody can use this to
+  // send mail to someone else.
+  await sgMail.send({
+    to: auth.token.email,
+    from: { email: FROM_EMAIL, name: FROM_NAME },
+    subject: `Your ReLoop volunteer shifts (${rows.length})`,
+    text: body,
+    html: textToHtml(body),
+    attachments: [asAttachment('my-volunteer-shifts.csv', csv)],
+  })
+
+  logger.info('shift summary sent', { uid: auth.uid, shifts: rows.length })
+  return { ok: true, sentTo: auth.token.email, shifts: rows.length }
+})
+
+/* BR D.2 + F.1: an admin emails every member or volunteer at once */
+
+export const emailMembers = onCall({ secrets: [SENDGRID_API_KEY] }, async (request) => {
+  const auth = requireSignedIn(request)
+  if ((await roleOf(auth.uid)) !== 'admin') {
+    throw new HttpsError('permission-denied', 'Only administrators can send bulk email.')
+  }
+
+  const subject = cleanText(request.data?.subject, { max: 120, label: 'Subject' })
+  const message = cleanText(request.data?.message, { max: 4000, label: 'Message' })
+  const audience = request.data?.audience ?? 'all'
+  if (!['all', 'member', 'volunteer'].includes(audience)) {
+    throw new HttpsError('invalid-argument', 'Please choose a valid audience.')
+  }
+
+  // Recipients come from Firestore, not from the browser.
+  const query = audience === 'all' ? db.collection('users') : db.collection('users').where('role', '==', audience)
+  const snapshot = await query.get()
+  const recipients = snapshot.docs
+    .map((entry) => entry.data())
+    .filter((user) => typeof user.email === 'string' && user.email.includes('@'))
+
+  if (!recipients.length) {
+    throw new HttpsError('failed-precondition', 'No one matches that audience yet.')
+  }
+
+  const csv = toCsv(
+    ['Name', 'Email', 'Role'],
+    recipients.map((user) => [user.name, user.email, user.role]),
+  )
+  const body = `${message}\n\n—\nReLoop Melbourne\nYou are receiving this because you have a ReLoop Melbourne account.`
+
+  sgMail.setApiKey(SENDGRID_API_KEY.value())
+  // One personalization per recipient: everyone gets their own copy and nobody
+  // sees anyone else's address.
+  await sgMail.send({
+    personalizations: recipients.map((user) => ({ to: [{ email: user.email, name: user.name }] })),
+    from: { email: FROM_EMAIL, name: FROM_NAME },
+    replyTo: { email: FROM_EMAIL, name: FROM_NAME },
+    subject,
+    text: body,
+    html: textToHtml(body),
+    attachments: [asAttachment('reloop-recipients.csv', csv)],
+  })
+
+  logger.info('bulk email sent', { uid: auth.uid, audience, recipients: recipients.length })
+  return { ok: true, recipients: recipients.length, audience }
+})

@@ -1,12 +1,14 @@
 <script setup>
 import { computed, reactive } from 'vue'
 import { useAuth } from '../composables/useAuth'
+import { useEmail } from '../composables/useEmail'
 import { useShifts } from '../composables/useShifts'
 import { events, isPastEvent } from '../data/events'
 import { shifts } from '../data/shifts'
 
 const { hasRole } = useAuth()
 const { myShifts, spotsLeft, isSignedUp, findClash, signUp, cancel } = useShifts()
+const { emailMyShifts } = useEmail()
 
 // Admins can open this page too (to see how shifts are filling up) but only
 // volunteers sign up.
@@ -27,6 +29,29 @@ const upcomingEvents = events
 
 // Feedback shown under the shift the user just acted on.
 const messages = reactive({})
+
+/* BR D.2: email myself a copy of my shifts, with a CSV attached */
+const emailState = reactive({ status: null, isError: false, sending: false })
+
+async function handleEmailShifts() {
+  emailState.status = null
+  emailState.sending = true
+
+  const payload = myShifts.value.map((shift) => ({
+    date: eventsById.get(shift.eventId).date,
+    event: eventsById.get(shift.eventId).title,
+    task: shift.task,
+    start: shift.start,
+    end: shift.end,
+  }))
+  const result = await emailMyShifts(payload)
+
+  emailState.sending = false
+  emailState.isError = !result.ok
+  emailState.status = result.ok
+    ? `Sent to ${result.sentTo}. Check your inbox for the CSV.`
+    : result.error
+}
 
 function handleSignUp(shift) {
   const result = signUp(shift.id)
@@ -106,6 +131,22 @@ function spotsText(shift) {
               </span>
             </li>
           </ul>
+          <button
+            type="button"
+            class="btn-reloop btn-reloop--outline btn-reloop--sm my-shifts__email"
+            :disabled="emailState.sending"
+            @click="handleEmailShifts"
+          >
+            {{ emailState.sending ? 'Sending…' : 'Email me this list' }}
+          </button>
+          <p
+            v-if="emailState.status"
+            class="my-shifts__status"
+            :class="{ 'is-error': emailState.isError }"
+            aria-live="polite"
+          >
+            {{ emailState.status }}
+          </p>
         </template>
         <template v-else>
           <h2 class="my-shifts__title">No shifts booked yet</h2>
@@ -226,6 +267,21 @@ function spotsText(shift) {
 
 .my-shifts__empty {
   margin: 0;
+}
+
+.my-shifts__email {
+  margin-top: 1rem;
+}
+
+.my-shifts__status {
+  margin: 0.6rem 0 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--loop);
+}
+
+.my-shifts__status.is-error {
+  color: var(--reclaim-dark);
 }
 
 .admin-note {

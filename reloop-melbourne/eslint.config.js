@@ -22,9 +22,9 @@ export default defineConfig([
   },
 
   {
-    // One-off setup scripts run in Node, not in the browser.
+    // Setup scripts and Cloud Functions run in Node, not in the browser.
     name: 'app/node-scripts',
-    files: ['scripts/**/*.{js,mjs}'],
+    files: ['scripts/**/*.{js,mjs}', 'functions/**/*.{js,mjs}'],
     languageOptions: {
       globals: {
         ...globals.node,

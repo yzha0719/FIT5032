@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app'
 import { getAuth } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
+import { getFunctions } from 'firebase/functions'
 
 // This config is not a secret. It only identifies the Firebase project, and
 // Firebase expects it to ship with the client code. What actually protects the
@@ -18,3 +19,6 @@ const firebaseConfig = {
 export const firebaseApp = initializeApp(firebaseConfig)
 export const auth = getAuth(firebaseApp)
 export const db = getFirestore(firebaseApp)
+
+// Same region the functions are deployed to, otherwise calls 404.
+export const functions = getFunctions(firebaseApp, 'australia-southeast1')
