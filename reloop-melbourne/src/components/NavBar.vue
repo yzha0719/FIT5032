@@ -9,7 +9,8 @@ const route = useRoute()
 const links = [
   { to: '/', label: 'Home' },
   { to: '/about', label: 'About Us' },
-  { to: '/recycling-hub', label: 'Recycling Hub' },
+  { to: '/recycling-hub', label: 'Recycling' },
+  { to: '/locator', label: 'Locator' },
   { to: '/events', label: 'Events' },
   { to: '/learning-centre', label: 'Learning Centre' },
   { to: '/get-involved', label: 'Get Involved' },
@@ -199,8 +200,9 @@ function closeMenu() {
 
   .site-nav__link {
     border-top: none;
-    padding: 0.5rem 0.85rem;
-    font-size: 0.92rem;
+    /* Tight enough that eight links plus the CTA still fit on one row at 992px */
+    padding: 0.5rem 0.65rem;
+    font-size: 0.9rem;
   }
 
   .site-nav__cta {

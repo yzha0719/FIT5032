@@ -7,6 +7,7 @@ const routes = [
   { path: '/recycling-hub', name: 'recycling-hub', component: () => import('../views/RecyclingHubView.vue') },
   { path: '/learning-centre', name: 'learning-centre', component: () => import('../views/LearningCentreView.vue') },
   { path: '/get-involved', name: 'get-involved', component: () => import('../views/GetInvolvedView.vue') },
+  { path: '/locator', name: 'locator', component: () => import('../views/LocatorView.vue') },
   { path: '/events', name: 'events', component: () => import('../views/EventsView.vue') },
   { path: '/contact', name: 'contact', component: () => import('../views/ContactView.vue') },
   { path: '/login', name: 'login', component: () => import('../views/LoginView.vue') },

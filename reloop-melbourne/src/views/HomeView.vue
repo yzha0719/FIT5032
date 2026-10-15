@@ -86,7 +86,7 @@ const featuredPosts = blogPosts.slice(0, 2)
         keeping useful materials in use, and out of landfill.
       </p>
       <div class="hero__ctas">
-        <router-link to="/recycling-hub" class="btn-reloop btn-reloop--primary">
+        <router-link to="/locator" class="btn-reloop btn-reloop--primary">
           Find a recycling point
         </router-link>
         <router-link to="/get-involved" class="btn-reloop btn-reloop--outline hero__cta-outline">
