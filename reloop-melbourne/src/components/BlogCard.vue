@@ -42,7 +42,7 @@ const formattedDate = new Date(props.post.date).toLocaleDateString('en-AU', {
 .blog-card__meta {
   font-family: var(--font-mono);
   font-size: 0.75rem;
-  color: var(--chalk);
+  color: var(--ink-soft);
   margin: 0;
 }
 </style>

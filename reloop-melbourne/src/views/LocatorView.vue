@@ -427,7 +427,7 @@ watch(travelMode, () => {
   font-weight: 600;
   color: var(--reclaim-dark);
   background-color: var(--paper);
-  border: 2px solid var(--reclaim);
+  border: 2px solid var(--reclaim-dark);
   border-radius: var(--radius);
 }
 

@@ -53,7 +53,7 @@ const countLabel = computed(() => `${props.count} ${props.count === 1 ? 'rating'
   font-size: 1.15rem;
   line-height: 1;
   white-space: nowrap;
-  color: var(--chalk);
+  color: var(--ink-soft);
 }
 
 .rating-summary__fill {
@@ -62,7 +62,7 @@ const countLabel = computed(() => `${props.count} ${props.count === 1 ? 'rating'
   left: 0;
   overflow: hidden;
   white-space: nowrap;
-  color: var(--reclaim);
+  color: var(--reclaim-dark);
 }
 
 .rating-summary__count {

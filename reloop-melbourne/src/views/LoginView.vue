@@ -396,7 +396,7 @@ function handleLogout() {
   font-weight: 600;
   color: var(--reclaim-dark);
   background-color: var(--paper);
-  border: 2px solid var(--reclaim);
+  border: 2px solid var(--reclaim-dark);
   border-radius: var(--radius);
 }
 
@@ -450,7 +450,7 @@ function handleLogout() {
 }
 
 .role-picker.has-error .role-option {
-  border-color: var(--reclaim);
+  border-color: var(--reclaim-dark);
 }
 
 .role-option input {

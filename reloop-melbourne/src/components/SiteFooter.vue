@@ -56,14 +56,15 @@ const year = new Date().getFullYear()
 }
 
 .site-footer__links a:hover {
-  color: var(--reclaim);
+  color: var(--reclaim-on-dark);
 }
 
 .site-footer__bottom {
   padding-top: 1.25rem;
   font-family: var(--font-mono);
   font-size: 0.75rem;
-  color: var(--chalk);
+  /* Chalk grey only reaches 4.1:1 on the ink background */
+  color: var(--kraft);
 }
 
 @media (min-width: 576px) {

@@ -325,7 +325,7 @@ th > span {
 }
 
 .data-table__icon {
-  color: var(--reclaim);
+  color: var(--reclaim-on-dark);
 }
 
 .data-table__search-row td {

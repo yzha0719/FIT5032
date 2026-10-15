@@ -125,7 +125,7 @@ const filteredGuide = computed(() => {
 .filter-bar__count {
   font-family: var(--font-mono);
   font-size: 0.82rem;
-  color: var(--chalk);
+  color: var(--ink-soft);
   margin: 0;
 }
 
@@ -146,13 +146,13 @@ const filteredGuide = computed(() => {
   border: none;
   font-family: var(--font-mono);
   font-size: 0.78rem;
-  color: var(--chalk);
+  color: var(--ink-soft);
   cursor: pointer;
   padding: 0.25rem 0;
 }
 
 .guide-card__save.is-saved {
-  color: var(--reclaim);
+  color: var(--reclaim-dark);
   font-weight: 700;
 }
 
@@ -176,7 +176,7 @@ const filteredGuide = computed(() => {
 }
 
 .guide-empty {
-  color: var(--chalk);
+  color: var(--ink-soft);
 }
 
 @media (min-width: 576px) {

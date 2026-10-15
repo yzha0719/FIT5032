@@ -107,7 +107,7 @@ function closeMenu() {
   font-size: 0.7rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--reclaim);
+  color: var(--reclaim-on-dark);
 }
 
 .site-nav__toggle {
@@ -165,7 +165,7 @@ function closeMenu() {
 }
 
 .site-nav__link.is-active {
-  color: var(--reclaim);
+  color: var(--reclaim-on-dark);
 }
 
 .site-nav__cta {

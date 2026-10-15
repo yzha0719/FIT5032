@@ -63,7 +63,7 @@ function isFilled(n) {
 }
 
 .star-input__star.is-filled {
-  color: var(--reclaim);
+  color: var(--reclaim-dark);
 }
 
 .star-input__star:has(input:focus-visible) {

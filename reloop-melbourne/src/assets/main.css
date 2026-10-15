@@ -3,10 +3,16 @@
   --paper-dim: #e2e3d6;
   --ink: #16241c;
   --ink-soft: #34433a;
+  /* The brand orange only reaches 2.9:1 on paper, so it is kept for large
+     decorative shapes while text and controls use the darker variants below.
+     The "-on-dark" versions are for the ink background, where the normal
+     brand colours are too dark to read (WCAG 2.1 AA, BR E.3). */
   --reclaim: #f2542d;
-  --reclaim-dark: #c73f1c;
-  --loop: #1f6f63;
+  --reclaim-dark: #9c2f0b;
+  --reclaim-on-dark: #ff8a5c;
+  --loop: #19594f;
   --loop-light: #2f9484;
+  --loop-on-dark: #5ec7b4;
   --kraft: #dcd3b8;
   --kraft-dark: #c8bc9a;
   --chalk: #7c8577;
@@ -85,8 +91,38 @@ button:focus-visible,
 input:focus-visible,
 textarea:focus-visible,
 select:focus-visible {
-  outline: 3px solid var(--reclaim);
+  outline: 3px solid var(--reclaim-dark);
   outline-offset: 2px;
+}
+
+/* The dark orange disappears against the ink background, so anything on it
+   gets a light focus ring instead. */
+.bg-ink a:focus-visible,
+.bg-ink button:focus-visible,
+.site-nav a:focus-visible,
+.site-nav button:focus-visible {
+  outline-color: var(--paper);
+}
+
+/* Keyboard users land here first and can jump past the navigation. */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  z-index: 100;
+  padding: 0.75rem 1.25rem;
+  font-weight: 700;
+  color: var(--paper);
+  background-color: var(--ink);
+  border-radius: 0 0 var(--radius) 0;
+}
+
+.skip-link:focus {
+  left: 0;
+  top: 0;
+}
+
+main:focus {
+  outline: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -119,6 +155,11 @@ select:focus-visible {
   flex: none;
 }
 
+/* The normal teal only reaches 2.7:1 on the ink background */
+.bg-ink .eyebrow {
+  color: var(--loop-on-dark);
+}
+
 .btn-reloop {
   display: inline-flex;
   align-items: center;
@@ -141,14 +182,14 @@ select:focus-visible {
 }
 
 .btn-reloop--primary {
-  background-color: var(--reclaim);
-  border-color: var(--reclaim);
+  background-color: var(--reclaim-dark);
+  border-color: var(--reclaim-dark);
   color: var(--paper);
 }
 
 .btn-reloop--primary:hover {
-  background-color: var(--reclaim-dark);
-  border-color: var(--reclaim-dark);
+  background-color: var(--ink);
+  border-color: var(--ink);
   color: var(--paper);
 }
 
@@ -201,7 +242,7 @@ select:focus-visible {
   align-items: center;
   gap: 0.75rem;
   margin: 3rem 0;
-  color: var(--chalk);
+  color: var(--ink-soft);
 }
 
 .ticket-divider::before,
@@ -227,7 +268,7 @@ select:focus-visible {
   display: block;
   font-family: var(--font-display);
   font-size: clamp(2.2rem, 3vw + 1rem, 3.4rem);
-  color: var(--reclaim);
+  color: var(--reclaim-dark);
   line-height: 1;
 }
 
@@ -274,7 +315,7 @@ select:focus-visible {
 .field.has-error input,
 .field.has-error select,
 .field.has-error textarea {
-  border-color: var(--reclaim);
+  border-color: var(--reclaim-dark);
 }
 
 .field__error {
@@ -289,7 +330,7 @@ select:focus-visible {
   display: block;
   margin-top: 0.35rem;
   font-size: 0.8rem;
-  color: var(--chalk);
+  color: var(--ink-soft);
 }
 
 .form-success {
@@ -329,5 +370,5 @@ select:focus-visible {
 }
 
 .text-reclaim {
-  color: var(--reclaim);
+  color: var(--reclaim-dark);
 }

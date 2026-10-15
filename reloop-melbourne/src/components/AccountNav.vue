@@ -92,7 +92,7 @@ function handleLogout() {
   font-size: 0.72rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--reclaim);
+  color: var(--reclaim-on-dark);
 }
 
 .account-nav__link {
@@ -111,7 +111,7 @@ function handleLogout() {
 }
 
 .account-nav__link.is-active {
-  color: var(--reclaim);
+  color: var(--reclaim-on-dark);
 }
 
 /* Desktop: slim bar above the main nav */

@@ -66,4 +66,27 @@ router.beforeEach(async (to) => {
   }
 })
 
+// A single-page app never reloads, so the title has to be updated by hand.
+// Screen reader users hear it on every navigation, and it names the tab.
+const pageTitles = {
+  home: 'Home',
+  about: 'About us',
+  'recycling-hub': 'Recycling hub',
+  locator: 'Find a drop-off or repair point',
+  events: 'Workshops & events',
+  'learning-centre': 'Learning centre',
+  'get-involved': 'Get involved',
+  contact: 'Contact',
+  login: 'Log in or register',
+  dashboard: 'My dashboard',
+  'volunteer-shifts': 'Volunteer shifts',
+  admin: 'Admin overview',
+  'access-denied': 'Access denied',
+}
+
+router.afterEach((to) => {
+  const page = pageTitles[to.name]
+  document.title = page ? `${page} · ReLoop Melbourne` : 'ReLoop Melbourne'
+})
+
 export default router
