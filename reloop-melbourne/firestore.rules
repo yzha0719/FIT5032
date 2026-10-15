@@ -1,0 +1,52 @@
+rules_version = '2';
+
+// Security rules for ReLoop Melbourne (BR C.4, D.1).
+// Firestore denies everything that isn't allowed here, so each rule below
+// opens up the smallest amount needed.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // Roles live in the user's own document, so a role check costs one read.
+    function roleOf(uid) {
+      return get(/databases/$(database)/documents/users/$(uid)).data.role;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && roleOf(request.auth.uid) == 'admin';
+    }
+
+    match /users/{uid} {
+      // People can read their own profile; admins can read the whole list for
+      // the admin page.
+      allow read: if isSelf(uid) || isAdmin();
+
+      // A new account may only create its own document, only with the fields
+      // we expect, and only with a role a visitor is allowed to pick. The
+      // admin role can only be set from the Firebase console, so nobody can
+      // give it to themselves by editing the request.
+      allow create: if isSelf(uid)
+        && request.resource.data.keys().hasOnly(['name', 'email', 'role', 'createdAt'])
+        && request.resource.data.role in ['member', 'volunteer']
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 2
+        && request.resource.data.name.size() <= 80;
+
+      // Users may edit their own name, but never their own role.
+      allow update: if isSelf(uid)
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.email == resource.data.email;
+
+      // Accounts are removed through Firebase Auth, not by the client.
+      allow delete: if false;
+    }
+  }
+}
