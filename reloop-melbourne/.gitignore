@@ -43,5 +43,8 @@ __screenshots__/
 .env.*
 !.env.example
 
+# Firebase CLI's local deploy cache: changes on every deploy, not source code.
+.firebase/
+
 CLAUDE.md
 .claude
