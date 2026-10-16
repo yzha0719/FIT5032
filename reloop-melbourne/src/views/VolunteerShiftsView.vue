@@ -1,6 +1,7 @@
 <script setup>
 import { computed, reactive } from 'vue'
 import { useAuth } from '../composables/useAuth'
+import { useCalendar } from '../composables/useCalendar'
 import { useEmail } from '../composables/useEmail'
 import { useShifts } from '../composables/useShifts'
 import { events, isPastEvent } from '../data/events'
@@ -9,6 +10,26 @@ import { shifts } from '../data/shifts'
 const { hasRole } = useAuth()
 const { myShifts, spotsLeft, isSignedUp, findClash, signUp, cancel } = useShifts()
 const { emailMyShifts } = useEmail()
+const { downloadIcs } = useCalendar()
+
+// BR F.1: hand the booked shifts to whatever calendar app the volunteer uses.
+function handleAddToCalendar() {
+  const shiftsForCalendar = myShifts.value.map((shift) => {
+    const event = eventsById.get(shift.eventId)
+    return {
+      id: shift.id,
+      date: event.date,
+      start: shift.start,
+      end: shift.end,
+      task: shift.task,
+      event: event.title,
+      suburb: event.suburb,
+    }
+  })
+  downloadIcs(shiftsForCalendar)
+  actionState.isError = false
+  actionState.status = `Downloaded ${shiftsForCalendar.length} ${shiftsForCalendar.length === 1 ? 'shift' : 'shifts'} as a calendar file. Open it to add them to your calendar.`
+}
 
 // Admins can open this page too (to see how shifts are filling up) but only
 // volunteers sign up.
@@ -31,11 +52,11 @@ const upcomingEvents = events
 const messages = reactive({})
 
 /* BR D.2: email myself a copy of my shifts, with a CSV attached */
-const emailState = reactive({ status: null, isError: false, sending: false })
+const actionState = reactive({ status: null, isError: false, sending: false })
 
 async function handleEmailShifts() {
-  emailState.status = null
-  emailState.sending = true
+  actionState.status = null
+  actionState.sending = true
 
   const payload = myShifts.value.map((shift) => ({
     date: eventsById.get(shift.eventId).date,
@@ -46,9 +67,9 @@ async function handleEmailShifts() {
   }))
   const result = await emailMyShifts(payload)
 
-  emailState.sending = false
-  emailState.isError = !result.ok
-  emailState.status = result.ok
+  actionState.sending = false
+  actionState.isError = !result.ok
+  actionState.status = result.ok
     ? `Sent to ${result.sentTo}. Check your inbox for the CSV.`
     : result.error
 }
@@ -131,21 +152,30 @@ function spotsText(shift) {
               </span>
             </li>
           </ul>
-          <button
-            type="button"
-            class="btn-reloop btn-reloop--outline btn-reloop--sm my-shifts__email"
-            :disabled="emailState.sending"
-            @click="handleEmailShifts"
-          >
-            {{ emailState.sending ? 'Sending…' : 'Email me this list' }}
-          </button>
+          <div class="my-shifts__actions">
+            <button
+              type="button"
+              class="btn-reloop btn-reloop--outline btn-reloop--sm"
+              :disabled="actionState.sending"
+              @click="handleEmailShifts"
+            >
+              {{ actionState.sending ? 'Sending…' : 'Email me this list' }}
+            </button>
+            <button
+              type="button"
+              class="btn-reloop btn-reloop--outline btn-reloop--sm"
+              @click="handleAddToCalendar"
+            >
+              Add to my calendar
+            </button>
+          </div>
           <p
-            v-if="emailState.status"
+            v-if="actionState.status"
             class="my-shifts__status"
-            :class="{ 'is-error': emailState.isError }"
+            :class="{ 'is-error': actionState.isError }"
             aria-live="polite"
           >
-            {{ emailState.status }}
+            {{ actionState.status }}
           </p>
         </template>
         <template v-else>
@@ -269,7 +299,10 @@ function spotsText(shift) {
   margin: 0;
 }
 
-.my-shifts__email {
+.my-shifts__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
   margin-top: 1rem;
 }
 
