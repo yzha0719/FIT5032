@@ -58,6 +58,16 @@ function getSummary(eventId) {
   return { average, count: totals.count }
 }
 
+// How many 1-star, 2-star … 5-star ratings exist overall. Used by the admin
+// chart to show whether the average hides a split opinion.
+function getDistribution() {
+  const counts = [0, 0, 0, 0, 0]
+  for (const rating of allRatings.value) {
+    counts[rating.stars - 1] += 1
+  }
+  return counts
+}
+
 function getUserRating(eventId) {
   if (!currentUser.value) return null
   const own = allRatings.value.find(
@@ -93,5 +103,5 @@ function rate(eventId, stars) {
 }
 
 export function useRatings() {
-  return { getSummary, getUserRating, canRate, rate }
+  return { getSummary, getDistribution, getUserRating, canRate, rate }
 }

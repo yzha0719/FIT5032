@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import BarChart from '../components/BarChart.vue'
 import DataTable from '../components/DataTable.vue'
 import RatingSummary from '../components/RatingSummary.vue'
 import { useAuth, ROLE_LABELS } from '../composables/useAuth'
@@ -10,7 +11,27 @@ import { maxLength, minLength, required, runValidators } from '../composables/us
 
 const { currentUser, fetchUsers } = useAuth()
 const { emailMembers } = useEmail()
-const { getSummary } = useRatings()
+const { getSummary, getDistribution } = useRatings()
+
+/* BR F.1: charts, so an admin can see the shape of the data, not just totals */
+
+const starLabels = ['1 star', '2 stars', '3 stars', '4 stars', '5 stars']
+const starCounts = computed(() => getDistribution())
+
+const starSummary = computed(() => {
+  const counts = starCounts.value
+  const total = counts.reduce((sum, count) => sum + count, 0)
+  const parts = counts.map((count, index) => `${count} at ${index + 1}`)
+  return `Ratings by star count, ${total} in total: ${parts.join(', ')} stars.`
+})
+
+const roleChartLabels = computed(() => roleCounts.value.map((item) => item.label))
+const roleChartValues = computed(() => roleCounts.value.map((item) => item.count))
+
+const roleSummary = computed(
+  () =>
+    `Accounts by role: ${roleCounts.value.map((item) => `${item.count} ${item.label}`).join(', ')}.`,
+)
 
 /* BR D.2: bulk email composer */
 
@@ -170,6 +191,36 @@ const ratingColumns = [
       </div>
 
       <div class="admin-block">
+        <h2 class="admin-heading">At a glance</h2>
+        <div class="chart-grid">
+          <div class="crate-card chart-card">
+            <span class="crate-card__tag">RATINGS</span>
+            <h3 class="chart-card__title">Ratings by star count</h3>
+            <BarChart
+              :labels="starLabels"
+              :values="starCounts"
+              unit="ratings"
+              color="#2f9484"
+              :summary="starSummary"
+            />
+          </div>
+
+          <div class="crate-card chart-card">
+            <span class="crate-card__tag">ACCOUNTS</span>
+            <h3 class="chart-card__title">Accounts by role</h3>
+            <BarChart
+              :labels="roleChartLabels"
+              :values="roleChartValues"
+              unit="accounts"
+              color="#f2542d"
+              horizontal
+              :summary="roleSummary"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div class="admin-block">
         <h2 class="admin-heading">Email members</h2>
         <div class="crate-card email-card">
           <span class="crate-card__tag">BULK EMAIL</span>
@@ -297,6 +348,22 @@ const ratingColumns = [
   margin: 0 0 1rem;
 }
 
+.chart-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+.chart-card {
+  height: auto;
+  padding-top: 1.75rem;
+}
+
+.chart-card__title {
+  margin: 0.25rem 0 1rem;
+  font-size: 1.1rem;
+}
+
 .email-card {
   height: auto;
   max-width: 48rem;
@@ -347,6 +414,10 @@ const ratingColumns = [
 @media (min-width: 768px) {
   .admin-stats {
     grid-template-columns: repeat(3, 1fr);
+  }
+
+  .chart-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
