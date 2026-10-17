@@ -36,6 +36,15 @@ const routes = [
     name: 'admin',
     component: () => import('../views/AdminView.vue'),
     meta: { requiresAuth: true, roles: ['admin'] }
+  },
+
+  // Anything that matched none of the routes above. Hosting rewrites every URL
+  // to index.html so the app can handle its own routing, which means a mistyped
+  // address arrives here rather than at a server 404. Must stay last.
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'not-found',
+    component: () => import('../views/NotFoundView.vue')
   }
 ]
 
@@ -82,6 +91,7 @@ const pageTitles = {
   'volunteer-shifts': 'Volunteer shifts',
   admin: 'Admin overview',
   'access-denied': 'Access denied',
+  'not-found': 'Page not found',
 }
 
 router.afterEach((to) => {
