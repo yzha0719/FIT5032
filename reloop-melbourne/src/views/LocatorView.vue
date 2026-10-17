@@ -458,6 +458,10 @@ watch(travelMode, () => {
   padding: 0.8rem 0.9rem;
   font-family: var(--font-body);
   text-align: left;
+  /* A button doesn't inherit the page's text colour: without this it falls back
+     to the browser's own button text, which is white under a dark system theme
+     and unreadable on paper (WCAG 2.1 AA, BR E.3). */
+  color: var(--ink);
   background-color: var(--paper);
   border: 2px solid var(--kraft-dark);
   border-radius: var(--radius);
