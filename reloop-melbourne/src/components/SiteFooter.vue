@@ -13,6 +13,7 @@ const year = new Date().getFullYear()
         <router-link to="/recycling-hub">Recycling & Waste Hub</router-link>
         <router-link to="/get-involved">Volunteer</router-link>
         <router-link to="/contact">Contact</router-link>
+        <router-link to="/developers">Open data API</router-link>
       </div>
     </div>
     <div class="container-app site-footer__bottom">

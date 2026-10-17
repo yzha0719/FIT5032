@@ -9,8 +9,9 @@ import { getFirestore } from 'firebase-admin/firestore'
 import { setGlobalOptions } from 'firebase-functions/v2'
 import { defineSecret } from 'firebase-functions/params'
 import { onDocumentWritten } from 'firebase-functions/v2/firestore'
-import { HttpsError, onCall } from 'firebase-functions/v2/https'
+import { HttpsError, onCall, onRequest } from 'firebase-functions/v2/https'
 import { logger } from 'firebase-functions'
+import { handleApiRequest } from './api.js'
 import sgMail from '@sendgrid/mail'
 
 const SENDGRID_API_KEY = defineSecret('SENDGRID_API_KEY')
@@ -280,3 +281,10 @@ export const countAccountsByRole = onDocumentWritten('users/{uid}', async (event
 
   logger.info('account counts rebuilt', { ...byRole, total: snapshot.size, from: before, to: after })
 })
+
+
+/* BR F.1: the public open-data API. Hosting rewrites /api/** to this function,
+   so it answers on the site's own domain rather than a separate run.app URL.
+   The request handling lives in api.js to keep this file readable. */
+
+export const api = onRequest({ cors: true, invoker: 'public' }, handleApiRequest)

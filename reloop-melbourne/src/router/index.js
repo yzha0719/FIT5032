@@ -1,3 +1,4 @@
+import { nextTick } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuth, waitForAuth } from '../composables/useAuth'
 
@@ -10,6 +11,11 @@ const routes = [
   { path: '/locator', name: 'locator', component: () => import('../views/LocatorView.vue') },
   { path: '/events', name: 'events', component: () => import('../views/EventsView.vue') },
   { path: '/contact', name: 'contact', component: () => import('../views/ContactView.vue') },
+  {
+    path: '/developers',
+    name: 'developers',
+    component: () => import('../views/DeveloperApiView.vue')
+  },
   { path: '/login', name: 'login', component: () => import('../views/LoginView.vue') },
   {
     path: '/access-denied',
@@ -86,6 +92,7 @@ const pageTitles = {
   'learning-centre': 'Learning centre',
   'get-involved': 'Get involved',
   contact: 'Contact',
+  developers: 'Developer API',
   login: 'Log in or register',
   dashboard: 'My dashboard',
   'volunteer-shifts': 'Volunteer shifts',
@@ -94,9 +101,26 @@ const pageTitles = {
   'not-found': 'Page not found',
 }
 
+// A single-page app never reloads, so focus stays wherever it was when the
+// link was clicked: a screen reader carries on reading the page the visitor has
+// just left, and the next Tab continues from the old position. Moving focus to
+// <main> makes a route change behave like a real page load, and the new title
+// is announced with it. The first navigation is left alone — on a fresh load
+// focus belongs at the top of the document, where the skip link is.
+let isFirstNavigation = true
+
 router.afterEach((to) => {
   const page = pageTitles[to.name]
   document.title = page ? `${page} · ReLoop Melbourne` : 'ReLoop Melbourne'
+
+  if (isFirstNavigation) {
+    isFirstNavigation = false
+    return
+  }
+
+  nextTick(() => {
+    document.getElementById('main-content')?.focus()
+  })
 })
 
 export default router

@@ -49,6 +49,20 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // The catalogue the public API serves (BR F.1). Browsers get no direct
+    // access: the API function reads these with the Admin SDK and decides which
+    // fields leave the building. Only an admin can publish changes, which is
+    // what scripts/seed-content.mjs does.
+    match /events/{id} {
+      allow read: if false;
+      allow write: if isAdmin();
+    }
+
+    match /locations/{id} {
+      allow read: if false;
+      allow write: if isAdmin();
+    }
+
     // Counts rebuilt by the countAccountsByRole function (BR E.1). No client
     // may write them: the only writer is the Admin SDK inside that function,
     // which bypasses these rules. Only the admin page reads them.
