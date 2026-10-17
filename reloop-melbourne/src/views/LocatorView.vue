@@ -339,12 +339,24 @@ watch(travelMode, () => {
 
         <div class="locator-map">
           <p v-if="mapError" class="locator-error" role="alert">{{ mapError }}</p>
-          <!-- v-show, not v-if: the ref has to stay attached for Mapbox -->
+          <!-- v-show, not v-if: the ref has to stay attached for Mapbox.
+
+               This used to carry aria-hidden, on the reasoning that the list
+               beside it says everything the map shows. But Mapbox builds its
+               own focusable controls in here, and aria-hidden hides them from a
+               screen reader while a keyboard can still land on them — arriving
+               somewhere that announces nothing (WCAG 4.1.2, BR E.3). Marking it
+               inert instead would have fixed that by removing the subtree from
+               the tab order, but inert also blocks mouse input, which would
+               stop anyone panning or zooming the map at all. So it is a plainly
+               named region: its controls are reachable and announced, and the
+               list remains the faster path for anyone not using the map. -->
           <div
             v-show="!mapError"
             ref="mapContainer"
             class="locator-map__canvas"
-            aria-hidden="true"
+            role="region"
+            aria-label="Interactive map of the places listed beside it"
           ></div>
 
           <div v-if="selectedPlace" class="locator-details crate-card">

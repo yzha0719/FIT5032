@@ -326,6 +326,13 @@ main:focus {
 /* Autofilled fields get the browser's own colours, and -webkit-text-fill-color
    beats the "color" above, so the palette has to be restated here. The inset
    shadow stands in for a background, which the browser will not let us set. */
+/* Bootstrap styles <code> in its own pink, which measures 3.01:1 on the
+   tinted card background — below the 4.5:1 minimum. The brand teal is both
+   readable and ours (WCAG 2.1 AA, BR E.3). */
+code {
+  color: var(--loop);
+}
+
 .field input:-webkit-autofill,
 .field input:-webkit-autofill:hover,
 .field input:-webkit-autofill:focus,
