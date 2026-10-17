@@ -4,6 +4,7 @@
 // never reach the browser. The key is stored in Secret Manager and injected at
 // run time, so it is not in the code, not in git, and not in the bundle.
 import { initializeApp } from 'firebase-admin/app'
+import { getAuth } from 'firebase-admin/auth'
 import { getFirestore } from 'firebase-admin/firestore'
 import { setGlobalOptions } from 'firebase-functions/v2'
 import { defineSecret } from 'firebase-functions/params'
@@ -14,6 +15,10 @@ import sgMail from '@sendgrid/mail'
 const SENDGRID_API_KEY = defineSecret('SENDGRID_API_KEY')
 
 // The address verified in SendGrid as a Single Sender.
+// Visitors may only pick 'member' or 'volunteer' when they register, so 'admin'
+// can be granted here and nowhere else in the app.
+const ASSIGNABLE_ROLES = ['member', 'volunteer', 'admin']
+
 const FROM_EMAIL = 'yimingzhangcn@gmail.com'
 const FROM_NAME = 'ReLoop Melbourne'
 
@@ -185,4 +190,57 @@ export const emailMembers = onCall({ secrets: [SENDGRID_API_KEY] }, async (reque
 
   logger.info('bulk email sent', { uid: auth.uid, audience, recipients: recipients.length })
   return { ok: true, recipients: recipients.length, audience }
+})
+
+
+/* BR E.1 + C.2: an admin changes someone else's role.
+
+   This is the one job in the project that cannot be done from the browser.
+   The rules in firestore.rules refuse every client-side write to a role field,
+   because the browser is exactly what we don't trust: a check that asks the
+   caller whether the caller is an admin proves nothing. Here the caller's own
+   role is read from Firestore with the Admin SDK, which bypasses the rules,
+   and the custom claim below can only be signed by a trusted server. */
+
+export const setUserRole = onCall(async (request) => {
+  const auth = requireSignedIn(request)
+  if ((await roleOf(auth.uid)) !== 'admin') {
+    throw new HttpsError('permission-denied', 'Only administrators can change a role.')
+  }
+
+  const uid = cleanText(request.data?.uid, { max: 128, label: 'Account' })
+  const role = String(request.data?.role ?? '')
+  if (!ASSIGNABLE_ROLES.includes(role)) {
+    throw new HttpsError('invalid-argument', 'Please choose a valid role.')
+  }
+  // Demoting yourself could leave the site with no administrator at all.
+  if (uid === auth.uid) {
+    throw new HttpsError('failed-precondition', 'You cannot change your own role.')
+  }
+
+  const profile = db.collection('users').doc(uid)
+  const snapshot = await profile.get()
+  if (!snapshot.exists) {
+    throw new HttpsError('not-found', 'That account no longer exists.')
+  }
+
+  const previous = snapshot.data().role
+  if (previous === role) {
+    return { ok: true, uid, role, previous, changed: false }
+  }
+
+  await profile.update({
+    role,
+    roleUpdatedAt: new Date().toISOString(),
+    roleUpdatedBy: auth.uid,
+  })
+
+  // The claim rides along inside the user's ID token, so security rules and
+  // other functions can read a role without a database lookup. It reaches that
+  // user's browser when their token next refreshes, so the Firestore document
+  // above stays the one source of truth the app reads today.
+  await getAuth().setCustomUserClaims(uid, { role })
+
+  logger.info('role changed', { by: auth.uid, uid, from: previous, to: role })
+  return { ok: true, uid, role, previous, changed: true }
 })

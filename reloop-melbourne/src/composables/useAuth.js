@@ -9,7 +9,8 @@ import {
   updateProfile,
 } from 'firebase/auth'
 import { collection, doc, getDoc, getDocs, serverTimestamp, setDoc } from 'firebase/firestore'
-import { auth, db } from '../firebase'
+import { httpsCallable } from 'firebase/functions'
+import { auth, db, functions } from '../firebase'
 import {
   required,
   minLength,
@@ -20,9 +21,12 @@ import {
 } from './useValidators'
 
 // Roles a visitor can pick for themselves when registering. 'admin' is left
-// out on purpose: the Firestore rules reject it too, so an admin account can
-// only be set up from the Firebase console.
+// out on purpose, and the Firestore rules reject it as well: an administrator
+// is only ever granted by the setUserRole Cloud Function.
 export const SELF_SERVICE_ROLES = ['member', 'volunteer']
+
+// Roles an administrator can hand out from the admin page.
+export const ASSIGNABLE_ROLES = ['member', 'volunteer', 'admin']
 
 // Display names for each role, shared by the navbar, login page and dashboards.
 export const ROLE_LABELS = {
@@ -222,6 +226,38 @@ async function fetchUsers() {
   })
 }
 
+// BR E.1 + C.2: role changes go through a Cloud Function, because a rule that
+// asked the browser whether the browser is an admin would prove nothing. The
+// messages below are ones the function wrote itself, so they are safe to show.
+const callSetUserRole = httpsCallable(functions, 'setUserRole')
+
+// The callable SDK appends the HTTP status to the message it carries back,
+// which readers don't need to see: "Please log in first. [401]".
+export function stripStatusCode(message) {
+  return String(message ?? '').replace(/\s*\[\d{3}\]$/, '')
+}
+
+async function changeUserRole(uid, role) {
+  const expected = [
+    'functions/unauthenticated',
+    'functions/permission-denied',
+    'functions/invalid-argument',
+    'functions/failed-precondition',
+    'functions/not-found',
+  ]
+  try {
+    const result = await callSetUserRole({ uid, role })
+    return { ok: true, ...result.data }
+  } catch (error) {
+    return {
+      ok: false,
+      error: expected.includes(error.code)
+        ? stripStatusCode(error.message)
+        : 'Could not change the role right now. Please try again in a moment.',
+    }
+  }
+}
+
 export function useAuth() {
   return {
     currentUser,
@@ -232,5 +268,6 @@ export function useAuth() {
     logout,
     hasRole,
     fetchUsers,
+    changeUserRole,
   }
 }

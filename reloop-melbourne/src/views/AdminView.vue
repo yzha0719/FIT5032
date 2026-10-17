@@ -3,13 +3,13 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import BarChart from '../components/BarChart.vue'
 import DataTable from '../components/DataTable.vue'
 import RatingSummary from '../components/RatingSummary.vue'
-import { useAuth, ROLE_LABELS } from '../composables/useAuth'
+import { useAuth, ASSIGNABLE_ROLES, ROLE_LABELS } from '../composables/useAuth'
 import { useEmail } from '../composables/useEmail'
 import { useRatings } from '../composables/useRatings'
 import { events, isPastEvent } from '../data/events'
 import { maxLength, minLength, required, runValidators } from '../composables/useValidators'
 
-const { currentUser, fetchUsers } = useAuth()
+const { currentUser, fetchUsers, changeUserRole } = useAuth()
 const { emailMembers } = useEmail()
 const { getSummary, getDistribution } = useRatings()
 
@@ -81,6 +81,35 @@ async function loadAccounts() {
   } catch {
     accountsError.value = 'Could not load accounts. Check your connection and try again.'
   }
+}
+
+/* BR E.1 + C.2: promote or demote an account. The Cloud Function decides
+   whether the change is allowed; everything here is only presentation. */
+
+const savingUid = ref(null)
+const roleStatus = ref(null)
+
+async function onRoleChange(row, event) {
+  const role = event.target.value
+  savingUid.value = row.id
+  roleStatus.value = null
+
+  const result = await changeUserRole(row.id, role)
+
+  savingUid.value = null
+  if (!result.ok) {
+    // row.role never changed, so put the dropdown back where it was.
+    event.target.value = row.role
+    roleStatus.value = { text: result.error, isError: true }
+    return
+  }
+
+  roleStatus.value = {
+    text: row.name + ' is now a ' + ROLE_LABELS[role] + '.',
+    isError: false,
+  }
+  // Re-reading the list keeps the table and the role chart in step.
+  await loadAccounts()
 }
 
 onMounted(loadAccounts)
@@ -284,7 +313,19 @@ const ratingColumns = [
 
       <div class="admin-block">
         <h2 class="admin-heading">Accounts</h2>
+        <p class="admin-note">
+          Changing a role calls a Cloud Function, which checks that you are an
+          administrator before it writes anything.
+        </p>
         <p v-if="accountsError" class="admin-error" role="alert">{{ accountsError }}</p>
+        <p
+          v-if="roleStatus"
+          class="email-status role-status"
+          :class="{ 'is-error': roleStatus.isError }"
+          role="status"
+        >
+          {{ roleStatus.text }}
+        </p>
         <DataTable
           :rows="accounts"
           :columns="accountColumns"
@@ -295,7 +336,21 @@ const ratingColumns = [
           empty-text="No accounts match your search."
         >
           <template #cell-role="{ row }">
-            <span class="role-badge">{{ ROLE_LABELS[row.role] }}</span>
+            <span v-if="row.id === currentUser?.id" class="role-badge">
+              {{ ROLE_LABELS[row.role] }} (you)
+            </span>
+            <select
+              v-else
+              class="role-select"
+              :value="row.role"
+              :disabled="savingUid === row.id"
+              :aria-label="'Role for ' + row.name"
+              @change="onRoleChange(row, $event)"
+            >
+              <option v-for="role in ASSIGNABLE_ROLES" :key="role" :value="role">
+                {{ ROLE_LABELS[role] }}
+              </option>
+            </select>
           </template>
         </DataTable>
       </div>
@@ -391,6 +446,33 @@ const ratingColumns = [
   background-color: var(--paper);
   border: 2px solid var(--reclaim-dark);
   border-radius: var(--radius);
+}
+
+.role-select {
+  min-height: 44px;
+  padding: 0.35em 0.5em;
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  color: var(--ink);
+  background-color: var(--paper);
+  border: 2px solid var(--ink);
+  border-radius: var(--radius);
+}
+
+.role-select:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.admin-note {
+  max-width: 62ch;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+}
+
+.role-status {
+  margin-bottom: 1rem;
 }
 
 .role-badge {

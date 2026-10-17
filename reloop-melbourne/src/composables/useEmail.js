@@ -1,5 +1,6 @@
 import { httpsCallable } from 'firebase/functions'
 import { functions } from '../firebase'
+import { stripStatusCode } from './useAuth'
 
 // Calls the Cloud Functions that send email (BR D.2, E.1). The functions do the
 // real work — the SendGrid key lives there, not in this bundle.
@@ -16,7 +17,7 @@ function readableError(error) {
     'functions/invalid-argument',
     'functions/failed-precondition',
   ]
-  if (expected.includes(error.code)) return error.message
+  if (expected.includes(error.code)) return stripStatusCode(error.message)
   return 'Could not send the email right now. Please try again in a moment.'
 }
 
