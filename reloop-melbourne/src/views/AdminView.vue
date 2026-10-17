@@ -1,17 +1,19 @@
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import BarChart from '../components/BarChart.vue'
 import DataTable from '../components/DataTable.vue'
 import RatingSummary from '../components/RatingSummary.vue'
 import { useAuth, ASSIGNABLE_ROLES, ROLE_LABELS } from '../composables/useAuth'
 import { useEmail } from '../composables/useEmail'
 import { useRatings } from '../composables/useRatings'
+import { useStats } from '../composables/useStats'
 import { events, isPastEvent } from '../data/events'
 import { maxLength, minLength, required, runValidators } from '../composables/useValidators'
 
 const { currentUser, fetchUsers, changeUserRole } = useAuth()
 const { emailMembers } = useEmail()
 const { getSummary, getDistribution } = useRatings()
+const { roleStats, watchRoleStats } = useStats()
 
 /* BR F.1: charts, so an admin can see the shape of the data, not just totals */
 
@@ -112,7 +114,14 @@ async function onRoleChange(row, event) {
   await loadAccounts()
 }
 
-onMounted(loadAccounts)
+let stopWatchingStats = null
+
+onMounted(() => {
+  loadAccounts()
+  stopWatchingStats = watchRoleStats()
+})
+
+onUnmounted(() => stopWatchingStats?.())
 // Reload if the signed-in user changes (for example after a page refresh
 // resolves the session).
 watch(currentUser, loadAccounts)
@@ -122,12 +131,28 @@ function countLabel(count, singular) {
   return count === 1 ? singular : `${singular}s`
 }
 
+/* BR E.1: the counts come from stats/overview, which a Firestore trigger
+   rebuilds on its own. Until it has run once — a fresh database, or a reader
+   who isn't allowed to see it — the page falls back to counting the list it
+   already has, so nothing looks broken. */
+
 const roleCounts = computed(() =>
   Object.entries(ROLE_LABELS).map(([role, label]) => {
-    const count = accounts.value.filter((user) => user.role === role).length
+    const count = roleStats.value
+      ? (roleStats.value.byRole?.[role] ?? 0)
+      : accounts.value.filter((user) => user.role === role).length
     return { role, count, label: countLabel(count, label) }
   }),
 )
+
+const roleCountsSource = computed(() => {
+  if (!roleStats.value) return 'Counted in the browser: the function has not rebuilt them yet.'
+  const at = new Date(roleStats.value.updatedAt)
+  const time = Number.isNaN(at.getTime())
+    ? 'just now'
+    : at.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' })
+  return `Rebuilt by a Cloud Function at ${time}, the moment an account last changed.`
+})
 
 // Past events only. Upcoming events can't be rated yet.
 const ratedEvents = computed(() =>
@@ -245,6 +270,7 @@ const ratingColumns = [
               horizontal
               :summary="roleSummary"
             />
+            <p class="chart-card__source">{{ roleCountsSource }}</p>
           </div>
         </div>
       </div>
@@ -446,6 +472,12 @@ const ratingColumns = [
   background-color: var(--paper);
   border: 2px solid var(--reclaim-dark);
   border-radius: var(--radius);
+}
+
+.chart-card__source {
+  margin-top: 0.75rem;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
 }
 
 .role-select {

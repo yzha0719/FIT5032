@@ -48,5 +48,13 @@ service cloud.firestore {
       // Accounts are removed through Firebase Auth, not by the client.
       allow delete: if false;
     }
+
+    // Counts rebuilt by the countAccountsByRole function (BR E.1). No client
+    // may write them: the only writer is the Admin SDK inside that function,
+    // which bypasses these rules. Only the admin page reads them.
+    match /stats/{document} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
   }
 }

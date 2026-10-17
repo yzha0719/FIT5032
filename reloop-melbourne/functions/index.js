@@ -8,6 +8,7 @@ import { getAuth } from 'firebase-admin/auth'
 import { getFirestore } from 'firebase-admin/firestore'
 import { setGlobalOptions } from 'firebase-functions/v2'
 import { defineSecret } from 'firebase-functions/params'
+import { onDocumentWritten } from 'firebase-functions/v2/firestore'
 import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { logger } from 'firebase-functions'
 import sgMail from '@sendgrid/mail'
@@ -243,4 +244,39 @@ export const setUserRole = onCall(async (request) => {
 
   logger.info('role changed', { by: auth.uid, uid, from: previous, to: role })
   return { ok: true, uid, role, previous, changed: true }
+})
+
+
+/* BR E.1: keep a count of accounts per role, rebuilt whenever one changes.
+
+   Nothing calls this function. Firestore itself wakes it up when a document
+   under users/ is written, which is the part a callable function can't show:
+   the work happens because the data moved, not because a browser asked.
+
+   Counting the collection from scratch is slower than adding one and
+   subtracting one, but it cannot drift. A missed or retried event leaves the
+   same answer behind, which matters more than the handful of reads it costs
+   at this size. It writes to stats/, never to users/, so it can't retrigger
+   itself. */
+
+export const countAccountsByRole = onDocumentWritten('users/{uid}', async (event) => {
+  const before = event.data?.before?.data()?.role ?? null
+  const after = event.data?.after?.data()?.role ?? null
+  // Someone correcting their name doesn't change any count.
+  if (before === after) return
+
+  const snapshot = await db.collection('users').get()
+  const byRole = { member: 0, volunteer: 0, admin: 0 }
+  for (const profile of snapshot.docs) {
+    const role = profile.data().role
+    if (role in byRole) byRole[role] += 1
+  }
+
+  await db.collection('stats').doc('overview').set({
+    byRole,
+    total: snapshot.size,
+    updatedAt: new Date().toISOString(),
+  })
+
+  logger.info('account counts rebuilt', { ...byRole, total: snapshot.size, from: before, to: after })
 })
