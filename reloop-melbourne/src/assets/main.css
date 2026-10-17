@@ -1,4 +1,9 @@
 :root {
+  /* The palette is light only, so form controls must not follow a dark system
+     theme: without this the browser paints autofilled fields with white text
+     (WCAG 2.1 AA, BR E.3). */
+  color-scheme: light;
+
   --paper: #edeee4;
   --paper-dim: #e2e3d6;
   --ink: #16241c;
@@ -316,6 +321,19 @@ main:focus {
 .field.has-error select,
 .field.has-error textarea {
   border-color: var(--reclaim-dark);
+}
+
+/* Autofilled fields get the browser's own colours, and -webkit-text-fill-color
+   beats the "color" above, so the palette has to be restated here. The inset
+   shadow stands in for a background, which the browser will not let us set. */
+.field input:-webkit-autofill,
+.field input:-webkit-autofill:hover,
+.field input:-webkit-autofill:focus,
+.field select:-webkit-autofill,
+.field textarea:-webkit-autofill {
+  -webkit-text-fill-color: var(--ink);
+  caret-color: var(--ink);
+  box-shadow: inset 0 0 0 100px var(--paper);
 }
 
 .field__error {
